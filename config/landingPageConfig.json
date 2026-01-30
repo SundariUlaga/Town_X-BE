@@ -1,0 +1,65 @@
+{
+  "title": "Town Exchange",
+  "location": "Chennai",
+  "header": {
+    "logo": {
+      "icon": "Home",
+      "title": "Town Exchange",
+      "subtitle": "📍 Chennai"
+    },
+    "postButton": {
+      "text": "Create Post",
+      "mobileText": "Post",
+      "actionUrl": "/create-post",
+      "color": "#7C01A2",
+      "hoverColor": "#5D1578"
+    }
+  },
+  "searchSection": {
+    "enabled": true,
+    "placeholder": "Search properties, locations...",
+    "defaultRadius": 5,
+    "maxRadius": 50,
+    "userLocation": {
+      "latitude": 13.094579,
+      "longitude": 80.183212
+    }
+  },
+  "featuredSection": {
+    "enabled": true,
+    "title": "Featured Properties",
+    "subtitle": "Explore trending listings",
+    "stories": []
+  },
+  "categories": {
+    "title": "Browse by Category",
+    "subtitle": "Choose your property type",
+    "items": [
+      {
+        "id": 1,
+        "name": "Rent/Lease",
+        "icon": "Key",
+        "color": "purple",
+        "description": "Find rental homes",
+        "actionUrl": "/category/rent-lease",
+        "categoryFilter": "Rent/Lease"
+      },
+      {
+        "id": 2,
+        "name": "Buy Property",
+        "icon": "Building2",
+        "color": "blue",
+        "description": "Own your dream",
+        "actionUrl": "/category/buy",
+        "categoryFilter": "Buy Land/Homes"
+      }
+    ]
+  },
+  "favouritesSection": {
+    "enabled": true,
+    "title": "View Favourites",
+    "subtitle": "See all your saved properties",
+    "icon": "Heart",
+    "actionUrl": "/favourites"
+  }
+}

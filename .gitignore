@@ -1,0 +1,19 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Uploads
+uploads/
