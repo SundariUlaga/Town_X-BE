@@ -1,19 +1,46 @@
-# Environment
+# Environment variables (keep .env.example for setup)
 .env
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+.env.*
+!.env.example
 
-# Database
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Database (local dev)
 *.db
 *.sqlite
+*.sqlite3
+
+# Uploads
+uploads/
+
+# Testing & coverage
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Uploads
-uploads/
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
