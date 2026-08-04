@@ -7,9 +7,9 @@ from datetime import datetime
 import json
 import os
 import logging
-
-from models import Base, Property, Story, User
-from database import engine, get_db
+from migrate_db import ensure_schema
+from models import Property, Story, User
+from database import get_db
 from schemas import (
     PropertyResponse,
     StoryCreate,
@@ -40,8 +40,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create all database tables
-Base.metadata.create_all(bind=engine)
+# Sync tables + additive column patches (SQLite won't add columns via create_all alone)
+ensure_schema()
 
 # Initialize FastAPI app
 app = FastAPI(
