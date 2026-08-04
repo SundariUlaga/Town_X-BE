@@ -6,9 +6,9 @@ class Settings(BaseSettings):
     """Application configuration settings"""
 
     # Cloudinary Configuration
-    CLOUDINARY_CLOUD_NAME: str
-    CLOUDINARY_API_KEY: str
-    CLOUDINARY_API_SECRET: str
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
 
     # Database Configuration
     DATABASE_URL: str = "sqlite:///./properties.db"
@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     STORY_ALLOWED_IMAGE_EXTENSIONS: Set[str] = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif"}
     STORY_ALLOWED_VIDEO_EXTENSIONS: Set[str] = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
     STORY_EXPIRY_HOURS: int = 24  # Stories expire after 24 hours
+
+    # API Server Settings
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8005
 
     # CORS Settings
     CORS_ORIGINS: list = [
@@ -48,6 +52,16 @@ class Settings(BaseSettings):
     # Security Settings (Optional)
     API_KEY_ENABLED: bool = False
     API_KEY: str = ""
+
+    # Auth / JWT Settings
+    # NOTE: JWT_SECRET_KEY defaults to a dev-only value — set a real secret via
+    # .env before any non-local deployment. Session handling here is
+    # intentionally simple (single access token, no refresh rotation) per an
+    # explicit "prototype the flow first" scope decision; token expiry is
+    # deliberately long-lived for that reason.
+    JWT_SECRET_KEY: str = "dev-only-insecure-secret-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRY_HOURS: int = 24 * 14
 
     class Config:
         env_file = ".env"

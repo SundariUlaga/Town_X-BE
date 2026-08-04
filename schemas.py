@@ -1,6 +1,44 @@
-from pydantic import BaseModel, Field, validator
-from typing import List, Optional
+from pydantic import BaseModel, EmailStr, Field, validator
+from typing import List, Literal, Optional
 from datetime import datetime
+
+
+# ========================================
+# AUTH / USER SCHEMAS
+# ========================================
+
+UserRole = Literal["buyer", "owner", "admin"]
+
+
+class UserSignup(BaseModel):
+    """Schema for account creation"""
+    name: str = Field(..., min_length=1, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=8, description="At least 8 characters")
+    role: UserRole = "buyer"
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    """Public-facing user shape — never includes password_hash"""
+    id: int
+    name: str
+    email: str
+    role: UserRole
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
 
 # ========================================
@@ -12,6 +50,7 @@ class PropertyResponse(BaseModel):
 
     # Primary Key
     id: int
+    owner_id: Optional[int] = None
 
     # Property Basic Info
     property_for: str

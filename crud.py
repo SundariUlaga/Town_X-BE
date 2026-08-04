@@ -3,11 +3,28 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import Property, Story, StoryView
+from models import Property, Story, StoryView, User
 from typing import List, Optional
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+# ========================================
+# USER / AUTH CRUD OPERATIONS
+# ========================================
+
+def create_user(db: Session, name: str, email: str, password_hash: str, role: str) -> User:
+    db_user = User(name=name, email=email, password_hash=password_hash, role=role)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    logger.info(f"✅ User created - ID: {db_user.id}, role: {role}")
+    return db_user
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    return db.query(User).filter(User.email == email).first()
 
 
 # ========================================
@@ -30,6 +47,7 @@ def get_properties(
         limit: int = 20,
         city: Optional[str] = None,
         property_for: Optional[str] = None,
+        property_type: Optional[str] = None,
         bhk_type: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
@@ -63,6 +81,8 @@ def get_properties(
         query = query.filter(Property.city.ilike(f"%{city}%"))
     if property_for:
         query = query.filter(Property.property_for == property_for)
+    if property_type:
+        query = query.filter(Property.property_type == property_type)
     if bhk_type:
         query = query.filter(Property.bhk_type == bhk_type)
     if min_price:
@@ -81,6 +101,18 @@ def get_properties(
 def get_property_by_id(db: Session, property_id: int) -> Optional[Property]:
     """Get a single property by ID"""
     return db.query(Property).filter(Property.id == property_id).first()
+
+
+def get_properties_by_owner(db: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Property]:
+    """Get all properties listed by a specific owner, newest first"""
+    return (
+        db.query(Property)
+        .filter(Property.owner_id == owner_id)
+        .order_by(Property.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 def update_property(

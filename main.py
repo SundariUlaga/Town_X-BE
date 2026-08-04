@@ -8,7 +8,7 @@ import json
 import os
 import logging
 
-from models import Base, Property, Story
+from models import Base, Property, Story, User
 from database import engine, get_db
 from schemas import (
     PropertyResponse,
@@ -16,10 +16,21 @@ from schemas import (
     StoryResponse,
     StoryStats,
     MessageResponse,
-    CategoryStats
+    CategoryStats,
+    UserSignup,
+    UserLogin,
+    UserResponse,
+    TokenResponse,
 )
 from utils.cloudinary_config import upload_multiple_images, delete_multiple_images
 from config import settings, validate_file_extension, get_max_file_size, is_video_file
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    get_optional_current_user,
+)
 import crud
 
 # Configure logging
@@ -159,6 +170,47 @@ async def health_check(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat(),
         "version": "2.0.0"
     }
+
+
+# ========================================
+# AUTH ENDPOINTS
+# ========================================
+
+@app.post("/api/auth/signup", response_model=TokenResponse, status_code=201)
+async def signup_endpoint(payload: UserSignup, db: Session = Depends(get_db)):
+    """Create an account and return a session token"""
+    existing = crud.get_user_by_email(db, payload.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    user = crud.create_user(
+        db,
+        name=payload.name,
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+    )
+    token = create_access_token(user)
+    logger.info(f"✅ Signup successful - {user.email} ({user.role})")
+    return TokenResponse(access_token=token, user=user)
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+async def login_endpoint(payload: UserLogin, db: Session = Depends(get_db)):
+    """Authenticate and return a session token"""
+    user = crud.get_user_by_email(db, payload.email)
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    token = create_access_token(user)
+    logger.info(f"✅ Login successful - {user.email} ({user.role})")
+    return TokenResponse(access_token=token, user=user)
+
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_me_endpoint(current_user: User = Depends(get_current_user)):
+    """Get the currently authenticated user"""
+    return current_user
 
 
 # ========================================
@@ -532,9 +584,15 @@ async def create_property_endpoint(
         description: Optional[str] = Form(None),
         amenities: str = Form("[]"),
         files: List[UploadFile] = File([]),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: Optional[User] = Depends(get_optional_current_user)
 ):
-    """Create a new property listing with images"""
+    """Create a new property listing with images.
+
+    Auth is optional here (posting must keep working for anonymous users per
+    the existing flow), but when a valid token is supplied the listing is
+    attributed to that account via owner_id.
+    """
     try:
         logger.info(f"🏠 Creating new property in {city}")
 
@@ -551,6 +609,7 @@ async def create_property_endpoint(
         )
 
         property_data = {
+            "owner_id": current_user.id if current_user else None,
             "property_for": property_for,
             "property_type": property_type,
             "user_type": user_type,
@@ -601,6 +660,7 @@ async def get_properties_endpoint(
         limit: int = Query(20, ge=1, le=100, description="Maximum records to return"),
         city: Optional[str] = Query(None, description="Filter by city"),
         property_for: Optional[str] = Query(None, description="Filter by purpose (Rent/Sell/PG)"),
+        property_type: Optional[str] = Query(None, description="Filter by type (Residential/Commercial)"),
         bhk_type: Optional[str] = Query(None, description="Filter by BHK type"),
         min_price: Optional[float] = Query(None, ge=0, description="Minimum price"),
         max_price: Optional[float] = Query(None, ge=0, description="Maximum price"),
@@ -611,6 +671,7 @@ async def get_properties_endpoint(
     """Get all property listings with optional filters"""
     properties = crud.get_properties(
         db=db, skip=skip, limit=limit, city=city, property_for=property_for,
+        property_type=property_type,
         bhk_type=bhk_type, min_price=min_price, max_price=max_price,
         category=category, furnishing_status=furnishing_status
     )
@@ -645,6 +706,19 @@ async def get_nearby_properties_endpoint(
         radius_km=radius, skip=skip, limit=limit
     )
     logger.info(f"📍 Found {len(properties)} properties within {radius}km")
+    return properties
+
+
+@app.get("/api/properties/mine", response_model=List[PropertyResponse])
+async def get_my_properties_endpoint(
+        skip: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=100),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Get properties listed by the logged-in user — powers the owner dashboard"""
+    properties = crud.get_properties_by_owner(db, current_user.id, skip, limit)
+    logger.info(f"🏠 Retrieved {len(properties)} properties for owner {current_user.id}")
     return properties
 
 
@@ -758,13 +832,13 @@ if __name__ == "__main__":
     import uvicorn
 
     logger.info("🚀 Starting Town Exchange API Server...")
-    logger.info(f"📍 Server will be available at: http://0.0.0.0:8000")
-    logger.info(f"📚 API Documentation: http://0.0.0.0:8000/docs")
+    logger.info(f"📍 Server will be available at: http://{settings.API_HOST}:{settings.API_PORT}")
+    logger.info(f"📚 API Documentation: http://{settings.API_HOST}:{settings.API_PORT}/docs")
 
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=settings.API_HOST,
+        port=settings.API_PORT,
         reload=True,
         log_level="info"
     )

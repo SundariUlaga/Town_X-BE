@@ -6,11 +6,38 @@ from datetime import datetime, timedelta
 Base = declarative_base()
 
 
+class User(Base):
+    """
+    Registered user account.
+
+    Roles are deliberately just three flat strings (not a separate table) —
+    matches the "prototype the flow first" scope: enough to route a user to
+    the right screen after login, without building out a full permissions
+    system yet.
+    """
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False, unique=True, index=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="buyer")  # 'buyer' | 'owner' | 'admin'
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<User {self.id}: {self.email} ({self.role})>"
+
+
 class Property(Base):
     """Property listing model"""
     __tablename__ = "properties"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # Owner (nullable — existing rows and manually-created listings predate
+    # accounts, so this can't be required without breaking them)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # Basic Information
     property_for = Column(String, nullable=False)
