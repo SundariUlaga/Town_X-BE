@@ -89,3 +89,13 @@ def require_role(*allowed_roles: str):
         return user
 
     return _check
+
+
+def require_kyc_verified(user: User = Depends(get_current_user)) -> User:
+    """Require a logged-in user who has completed eKYC verification."""
+    if user.kyc_status != "verified":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Complete identity verification to access this section",
+        )
+    return user

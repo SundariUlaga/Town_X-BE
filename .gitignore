@@ -24,6 +24,10 @@ ENV/
 # Uploads
 uploads/
 
+# Location data build artifacts (committed output lives in app/data/)
+scripts/_source/
+_tmp/
+
 # Testing & coverage
 .pytest_cache/
 .mypy_cache/

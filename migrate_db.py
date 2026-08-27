@@ -19,6 +19,23 @@ logger = logging.getLogger(__name__)
 # column_name -> SQL type fragment for SQLite ALTER TABLE
 PROPERTY_COLUMN_PATCHES: dict[str, str] = {
     "owner_id": "INTEGER",
+    "status": "VARCHAR DEFAULT 'PUBLISHED'",
+    "admin_notes": "TEXT",
+    "published_at": "DATETIME",
+    "title_deed_url": "VARCHAR",
+    "survey_parcel_number": "VARCHAR",
+    "encumbrance_certificate_status": "VARCHAR",
+    "verification_tier": "VARCHAR DEFAULT 'unverified'",
+}
+
+USER_COLUMN_PATCHES: dict[str, str] = {
+    "kyc_status": "VARCHAR DEFAULT 'pending'",
+    "kyc_verification_id": "VARCHAR",
+    "kyc_reference_id": "INTEGER",
+    "kyc_mobile": "VARCHAR",
+    "kyc_digilocker_id": "VARCHAR",
+    "kyc_verified_at": "DATETIME",
+    "phone": "VARCHAR",
 }
 
 
@@ -48,6 +65,10 @@ def ensure_schema(db_engine: Engine | None = None) -> None:
     with db_engine.begin() as conn:
         for column, sql_type in PROPERTY_COLUMN_PATCHES.items():
             _add_column_if_missing(conn, "properties", column, sql_type)
+
+        if inspector.has_table("users"):
+            for column, sql_type in USER_COLUMN_PATCHES.items():
+                _add_column_if_missing(conn, "users", column, sql_type)
 
 
 def create_tables() -> None:

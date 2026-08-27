@@ -1,6 +1,11 @@
 {
   "title": "Town Exchange",
   "location": "Chennai",
+  "defaultLocation": {
+    "id": 568,
+    "name": "Chennai",
+    "type": "district"
+  },
   "header": {
     "logo": {
       "icon": "Home",

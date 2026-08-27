@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import Property, Story, StoryView, User
+from models import Property, Story, StoryView, SupportQuestion, User, SavedSearch, Notification, Advertisement, UserFavourite, UserActivity, PropertyEnquiry, PropertyReport, AuditLog, PropertyReviewNote
 from typing import List, Optional
 
 # Setup logging
@@ -14,8 +14,22 @@ logger = logging.getLogger(__name__)
 # USER / AUTH CRUD OPERATIONS
 # ========================================
 
-def create_user(db: Session, name: str, email: str, password_hash: str, role: str) -> User:
-    db_user = User(name=name, email=email, password_hash=password_hash, role=role)
+def create_user(
+    db: Session,
+    name: str,
+    email: str,
+    password_hash: str,
+    role: str,
+    phone: str | None = None,
+) -> User:
+    db_user = User(
+        name=name,
+        email=email,
+        password_hash=password_hash,
+        role=role,
+        phone=phone,
+        kyc_mobile=phone,
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -25,6 +39,71 @@ def create_user(db: Session, name: str, email: str, password_hash: str, role: st
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     return db.query(User).filter(User.email == email).first()
+
+
+def get_user_by_phone(db: Session, phone: str) -> Optional[User]:
+    return db.query(User).filter(User.phone == phone).first()
+
+
+def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def update_user_kyc(
+    db: Session,
+    user: User,
+    *,
+    kyc_status: str,
+    kyc_verification_id: str | None = None,
+    kyc_reference_id: int | None = None,
+    kyc_mobile: str | None = None,
+    kyc_digilocker_id: str | None = None,
+    kyc_verified_at=None,
+) -> User:
+    user.kyc_status = kyc_status
+    if kyc_verification_id is not None:
+        user.kyc_verification_id = kyc_verification_id
+    if kyc_reference_id is not None:
+        user.kyc_reference_id = kyc_reference_id
+    if kyc_mobile is not None:
+        user.kyc_mobile = kyc_mobile
+    if kyc_digilocker_id is not None:
+        user.kyc_digilocker_id = kyc_digilocker_id
+    if kyc_verified_at is not None:
+        user.kyc_verified_at = kyc_verified_at
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_profile(db: Session, user: User, *, name: str) -> User:
+    user.name = name
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_support_question(
+    db: Session,
+    *,
+    user_id: int,
+    subject: str,
+    message: str,
+) -> SupportQuestion:
+    question = SupportQuestion(user_id=user_id, subject=subject, message=message)
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return question
+
+
+def get_user_support_questions(db: Session, user_id: int) -> List[SupportQuestion]:
+    return (
+        db.query(SupportQuestion)
+        .filter(SupportQuestion.user_id == user_id)
+        .order_by(SupportQuestion.created_at.desc())
+        .all()
+    )
 
 
 # ========================================
@@ -53,14 +132,21 @@ def get_properties(
         max_price: Optional[float] = None,
         category: Optional[str] = None,
         furnishing_status: Optional[str] = None,
-        favourites_only: bool = False
+        favourites_only: bool = False,
+        published_only: bool = True,
+        owner_id: Optional[int] = None,
+        status: Optional[str] = None,
 ) -> List[Property]:
     """Get all properties with optional filters"""
     query = db.query(Property)
 
-    # Filter favourites
-    if favourites_only:
-        query = query.filter(Property.is_favourite == True)
+    if published_only and status is None:
+        query = query.filter(Property.status == "PUBLISHED")
+    elif status:
+        query = query.filter(Property.status == status)
+
+    if owner_id is not None:
+        query = query.filter(Property.owner_id == owner_id)
 
     # Category-based filtering
     if category:
@@ -181,32 +267,134 @@ def get_category_counts(db: Session) -> dict:
     }
 
 
+def update_property_fields(db: Session, prop: Property, data: dict) -> Property:
+    for key, value in data.items():
+        if hasattr(prop, key):
+            setattr(prop, key, value)
+    prop.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(prop)
+    return prop
+
+
+def create_property_review_note(
+    db: Session,
+    *,
+    property_id: int,
+    note_type: str,
+    note: str,
+    admin_user_id: int | None = None,
+) -> PropertyReviewNote:
+    entry = PropertyReviewNote(
+        property_id=property_id,
+        admin_user_id=admin_user_id,
+        note_type=note_type,
+        note=note.strip(),
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def get_property_review_notes(db: Session, property_id: int) -> list[PropertyReviewNote]:
+    return (
+        db.query(PropertyReviewNote)
+        .filter(PropertyReviewNote.property_id == property_id)
+        .order_by(PropertyReviewNote.created_at.desc())
+        .all()
+    )
+
+
+def get_published_properties(db: Session, skip: int = 0, limit: int = 20) -> List[Property]:
+    return (
+        db.query(Property)
+        .filter(Property.status == "PUBLISHED")
+        .order_by(Property.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_user_favourite_ids(db: Session, user_id: int) -> set[int]:
+    rows = db.query(UserFavourite.property_id).filter(UserFavourite.user_id == user_id).all()
+    return {row[0] for row in rows}
+
+
+def attach_favourite_flags(db: Session, properties: List[Property], user_id: int | None) -> List[Property]:
+    if not user_id:
+        for prop in properties:
+            prop.is_favourite = False
+        return properties
+    fav_ids = get_user_favourite_ids(db, user_id)
+    for prop in properties:
+        prop.is_favourite = prop.id in fav_ids
+    return properties
+
+
 # ========================================
 # FAVOURITE FUNCTIONS
 # ========================================
 
-def toggle_favourite(db: Session, property_id: int) -> Optional[Property]:
-    """Toggle favourite status of a property"""
-    property_data = get_property_by_id(db, property_id)
+def toggle_user_favourite(db: Session, user_id: int, property_id: int) -> tuple[bool, Property | None]:
+    prop = get_property_by_id(db, property_id)
+    if not prop:
+        return False, None
 
+    existing = (
+        db.query(UserFavourite)
+        .filter(UserFavourite.user_id == user_id, UserFavourite.property_id == property_id)
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        is_favourite = False
+    else:
+        db.add(UserFavourite(user_id=user_id, property_id=property_id))
+        is_favourite = True
+    db.commit()
+    prop.is_favourite = is_favourite
+    return is_favourite, prop
+
+
+def get_user_favourite_properties(
+    db: Session, user_id: int, skip: int = 0, limit: int = 100
+) -> List[Property]:
+    rows = (
+        db.query(Property)
+        .join(UserFavourite, UserFavourite.property_id == Property.id)
+        .filter(UserFavourite.user_id == user_id)
+        .order_by(UserFavourite.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    for prop in rows:
+        prop.is_favourite = True
+    return rows
+
+
+def get_user_favourites_count(db: Session, user_id: int) -> int:
+    return db.query(UserFavourite).filter(UserFavourite.user_id == user_id).count()
+
+
+def toggle_favourite(db: Session, property_id: int) -> Optional[Property]:
+    """Deprecated global toggle — kept for backward compatibility."""
+    property_data = get_property_by_id(db, property_id)
     if property_data:
         property_data.is_favourite = not property_data.is_favourite
         db.commit()
         db.refresh(property_data)
-        logger.info(f"❤️ Property {property_id} favourite: {property_data.is_favourite}")
-
     return property_data
 
 
 def get_favourite_properties(db: Session, skip: int = 0, limit: int = 100) -> List[Property]:
-    """Get all favourite properties"""
-    return db.query(Property).filter(
-        Property.is_favourite == True
-    ).order_by(Property.created_at.desc()).offset(skip).limit(limit).all()
+    """Deprecated global favourites list."""
+    return db.query(Property).filter(Property.is_favourite == True).order_by(Property.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def get_favourites_count(db: Session) -> int:
-    """Get count of favourite properties"""
     return db.query(Property).filter(Property.is_favourite == True).count()
 
 
@@ -728,3 +916,489 @@ def get_stories_expiring_soon(db: Session, hours: int = 1, limit: int = 50) -> L
     logger.info(f"⏰ Found {len(stories)} stories expiring within {hours} hour(s)")
 
     return stories
+
+
+# ========================================
+# SAVED SEARCH & NOTIFICATION CRUD
+# ========================================
+
+def _criteria_key(criteria: dict) -> str:
+    """Stable key for deduplicating saved searches."""
+    parts = []
+    for key in sorted(criteria.keys()):
+        value = criteria.get(key)
+        if value is None or value == "":
+            continue
+        parts.append(f"{key}={value}")
+    return "|".join(parts).lower()
+
+
+def build_saved_search_label(criteria: dict) -> str:
+    if criteria.get("q"):
+        return str(criteria["q"]).strip()[:120]
+    bits = [criteria.get("city"), criteria.get("locality"), criteria.get("bhk_type")]
+    label = ", ".join([b for b in bits if b])
+    if criteria.get("property_for"):
+        label = f"{label} · {criteria['property_for']}" if label else str(criteria["property_for"])
+    return (label or "Property search")[:120]
+
+
+def upsert_saved_search(
+    db: Session,
+    *,
+    user_id: int,
+    criteria: dict,
+    label: str | None = None,
+    is_active: bool = True,
+) -> SavedSearch:
+    normalized = {k: v for k, v in criteria.items() if v is not None and v != ""}
+    key = _criteria_key(normalized)
+    existing = get_user_saved_searches(db, user_id)
+    for row in existing:
+        if _criteria_key(row.criteria or {}) == key:
+            row.label = label or row.label
+            row.criteria = normalized
+            row.is_active = is_active
+            row.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(row)
+            return row
+
+    if len(existing) >= 20:
+        oldest = sorted(existing, key=lambda r: r.updated_at or r.created_at)[0]
+        db.delete(oldest)
+        db.commit()
+
+    search = SavedSearch(
+        user_id=user_id,
+        label=label or build_saved_search_label(normalized),
+        criteria=normalized,
+        is_active=is_active,
+    )
+    db.add(search)
+    db.commit()
+    db.refresh(search)
+    return search
+
+
+def get_user_saved_searches(db: Session, user_id: int) -> List[SavedSearch]:
+    return (
+        db.query(SavedSearch)
+        .filter(SavedSearch.user_id == user_id)
+        .order_by(SavedSearch.updated_at.desc())
+        .all()
+    )
+
+
+def delete_saved_search(db: Session, user_id: int, search_id: int) -> bool:
+    row = (
+        db.query(SavedSearch)
+        .filter(SavedSearch.id == search_id, SavedSearch.user_id == user_id)
+        .first()
+    )
+    if not row:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def get_active_saved_searches(db: Session) -> List[SavedSearch]:
+    return (
+        db.query(SavedSearch)
+        .filter(SavedSearch.is_active == True)
+        .order_by(SavedSearch.updated_at.desc())
+        .all()
+    )
+
+
+def property_matches_criteria(property_row: Property, criteria: dict) -> bool:
+    if not criteria:
+        return False
+
+    if criteria.get("city"):
+        if criteria["city"].lower() not in (property_row.city or "").lower():
+            return False
+
+    if criteria.get("locality"):
+        if criteria["locality"].lower() not in (property_row.locality or "").lower():
+            return False
+
+    if criteria.get("property_for") and property_row.property_for != criteria["property_for"]:
+        return False
+
+    if criteria.get("property_type") and property_row.property_type != criteria["property_type"]:
+        return False
+
+    if criteria.get("bhk_type") and property_row.bhk_type != criteria["bhk_type"]:
+        return False
+
+    if criteria.get("furnishing_status") and property_row.furnishing_status != criteria["furnishing_status"]:
+        return False
+
+    min_price = criteria.get("min_price")
+    if min_price is not None and property_row.expected_price < float(min_price):
+        return False
+
+    max_price = criteria.get("max_price")
+    if max_price is not None and property_row.expected_price > float(max_price):
+        return False
+
+    category = criteria.get("category")
+    if category == "Rent/Lease" and property_row.property_for != "Rent/Lease":
+        return False
+    if category == "Buy Land/Homes" and property_row.property_for != "Sell":
+        return False
+
+    q = (criteria.get("q") or "").strip().lower()
+    if q:
+        haystack = " ".join(
+            filter(
+                None,
+                [property_row.locality, property_row.city, property_row.apartment_name or ""],
+            )
+        ).lower()
+        if q not in haystack:
+            return False
+
+    return True
+
+
+def create_notification(
+    db: Session,
+    *,
+    user_id: int,
+    type: str,
+    title: str,
+    body: str,
+    property_id: int | None = None,
+    saved_search_id: int | None = None,
+    payload: dict | None = None,
+) -> Notification:
+    note = Notification(
+        user_id=user_id,
+        type=type,
+        title=title,
+        body=body,
+        property_id=property_id,
+        saved_search_id=saved_search_id,
+        payload=payload,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+def notification_exists(
+    db: Session,
+    *,
+    user_id: int,
+    type: str,
+    property_id: int | None = None,
+    saved_search_id: int | None = None,
+) -> bool:
+    query = db.query(Notification).filter(
+        Notification.user_id == user_id,
+        Notification.type == type,
+    )
+    if property_id is not None:
+        query = query.filter(Notification.property_id == property_id)
+    if saved_search_id is not None:
+        query = query.filter(Notification.saved_search_id == saved_search_id)
+    return query.first() is not None
+
+
+def get_user_notifications(
+    db: Session,
+    user_id: int,
+    *,
+    skip: int = 0,
+    limit: int = 30,
+    unread_only: bool = False,
+) -> tuple[List[Notification], int]:
+    query = db.query(Notification).filter(Notification.user_id == user_id)
+    if unread_only:
+        query = query.filter(Notification.is_read == False)
+    total = query.count()
+    items = (
+        query.order_by(Notification.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return items, total
+
+
+def get_unread_notification_count(db: Session, user_id: int) -> int:
+    return (
+        db.query(Notification)
+        .filter(Notification.user_id == user_id, Notification.is_read == False)
+        .count()
+    )
+
+
+def mark_notification_read(db: Session, user_id: int, notification_id: int) -> Optional[Notification]:
+    note = (
+        db.query(Notification)
+        .filter(Notification.id == notification_id, Notification.user_id == user_id)
+        .first()
+    )
+    if not note:
+        return None
+    note.is_read = True
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+def mark_all_notifications_read(db: Session, user_id: int) -> int:
+    updated = (
+        db.query(Notification)
+        .filter(Notification.user_id == user_id, Notification.is_read == False)
+        .update({Notification.is_read: True}, synchronize_session=False)
+    )
+    db.commit()
+    return updated
+
+
+# ========================================
+# ADVERTISEMENT CRUD
+# ========================================
+
+def create_advertisement(db: Session, data: dict) -> Advertisement:
+    ad = Advertisement(**data)
+    db.add(ad)
+    db.commit()
+    db.refresh(ad)
+    logger.info("Advertisement created #%s — %s", ad.id, ad.title)
+    return ad
+
+
+def get_advertisement_by_id(db: Session, ad_id: int) -> Optional[Advertisement]:
+    return db.query(Advertisement).filter(Advertisement.id == ad_id).first()
+
+
+def get_user_advertisements(db: Session, user_id: int) -> List[Advertisement]:
+    return (
+        db.query(Advertisement)
+        .filter(Advertisement.user_id == user_id)
+        .order_by(Advertisement.created_at.desc())
+        .all()
+    )
+
+
+def get_all_advertisements(db: Session, status: Optional[str] = None) -> List[Advertisement]:
+    query = db.query(Advertisement)
+    if status:
+        query = query.filter(Advertisement.status == status)
+    return query.order_by(Advertisement.display_position.asc(), Advertisement.created_at.desc()).all()
+
+
+def update_advertisement(db: Session, ad: Advertisement, data: dict) -> Advertisement:
+    for key, value in data.items():
+        if hasattr(ad, key):
+            setattr(ad, key, value)
+    ad.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(ad)
+    return ad
+
+
+def refresh_advertisement_statuses(db: Session) -> int:
+    """Expire published ads past end_date; publish approved ads past start_date."""
+    from services.ad_lifecycle import notify_ad_expired, notify_ad_published
+
+    now = datetime.utcnow()
+    changed = 0
+
+    expired = (
+        db.query(Advertisement)
+        .filter(
+            Advertisement.status == "PUBLISHED",
+            Advertisement.end_date.isnot(None),
+            Advertisement.end_date < now,
+        )
+        .all()
+    )
+    for ad in expired:
+        ad.status = "EXPIRED"
+        notify_ad_expired(db, ad)
+        changed += 1
+
+    to_publish = (
+        db.query(Advertisement)
+        .filter(
+            Advertisement.status == "APPROVED",
+            Advertisement.show_on_homepage == True,
+            Advertisement.start_date.isnot(None),
+            Advertisement.start_date <= now,
+            (Advertisement.end_date.is_(None)) | (Advertisement.end_date >= now),
+        )
+        .all()
+    )
+    for ad in to_publish:
+        ad.status = "PUBLISHED"
+        notify_ad_published(db, ad)
+        changed += 1
+
+    if changed:
+        db.commit()
+    return changed
+
+
+def get_homepage_slider_ads(db: Session) -> List[Advertisement]:
+    refresh_advertisement_statuses(db)
+    now = datetime.utcnow()
+    return (
+        db.query(Advertisement)
+        .filter(
+            Advertisement.status == "PUBLISHED",
+            Advertisement.show_on_homepage == True,
+            (Advertisement.start_date.is_(None)) | (Advertisement.start_date <= now),
+            (Advertisement.end_date.is_(None)) | (Advertisement.end_date >= now),
+        )
+        .order_by(Advertisement.display_position.asc(), Advertisement.created_at.desc())
+        .all()
+    )
+
+
+def track_advertisement_event(db: Session, ad: Advertisement, event: str) -> Advertisement:
+    if event == "impression":
+        ad.impressions += 1
+    elif event == "view":
+        ad.views += 1
+    elif event == "click":
+        ad.clicks += 1
+    elif event == "enquiry":
+        ad.enquiries += 1
+    db.commit()
+    db.refresh(ad)
+    return ad
+
+
+def count_advertisements_by_status(db: Session, status: str) -> int:
+    return db.query(Advertisement).filter(Advertisement.status == status).count()
+
+
+def get_admin_dashboard_stats(db: Session) -> dict:
+    return {
+        "total_users": db.query(User).count(),
+        "total_properties": db.query(Property).count(),
+        "pending_advertisements": count_advertisements_by_status(db, "PENDING_REVIEW"),
+        "pending_properties": db.query(Property).filter(Property.status == "PENDING_REVIEW").count(),
+        "published_properties": db.query(Property).filter(Property.status == "PUBLISHED").count(),
+        "open_reports": db.query(PropertyReport).filter(PropertyReport.status == "OPEN").count(),
+        "changes_requested_advertisements": count_advertisements_by_status(db, "CHANGES_REQUESTED"),
+        "scheduled_advertisements": count_advertisements_by_status(db, "APPROVED"),
+        "published_advertisements": count_advertisements_by_status(db, "PUBLISHED"),
+        "expired_advertisements": count_advertisements_by_status(db, "EXPIRED"),
+        "rejected_advertisements": count_advertisements_by_status(db, "REJECTED"),
+    }
+
+
+def _normalize_admin_ad_status(status: Optional[str]) -> Optional[str]:
+    if not status:
+        return None
+    normalized = status.strip().upper()
+    if normalized == "SCHEDULED":
+        return "APPROVED"
+    return normalized
+
+
+def search_advertisements_admin(
+    db: Session,
+    *,
+    skip: int = 0,
+    limit: int = 20,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    user_id: Optional[int] = None,
+    property_id: Optional[int] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> tuple[list[Advertisement], int]:
+    query = db.query(Advertisement)
+    db_status = _normalize_admin_ad_status(status)
+    if db_status:
+        query = query.filter(Advertisement.status == db_status)
+    if user_id is not None:
+        query = query.filter(Advertisement.user_id == user_id)
+    if property_id is not None:
+        query = query.filter(Advertisement.property_id == property_id)
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (Advertisement.title.ilike(term))
+            | (Advertisement.location.ilike(term))
+            | (Advertisement.description.ilike(term))
+        )
+    if date_from is not None:
+        query = query.filter(Advertisement.created_at >= date_from)
+    if date_to is not None:
+        query = query.filter(Advertisement.created_at <= date_to)
+
+    total = query.count()
+    items = (
+        query.order_by(Advertisement.created_at.desc(), Advertisement.display_position.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return items, total
+
+
+def list_users_admin(
+    db: Session,
+    *,
+    skip: int = 0,
+    limit: int = 20,
+    role: Optional[str] = None,
+    kyc_status: Optional[str] = None,
+    search: Optional[str] = None,
+) -> tuple[list[User], int]:
+    query = db.query(User)
+    if role:
+        query = query.filter(User.role == role)
+    if kyc_status:
+        query = query.filter(User.kyc_status == kyc_status)
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (User.name.ilike(term))
+            | (User.email.ilike(term))
+            | (User.phone.ilike(term))
+        )
+    total = query.count()
+    items = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
+    return items, total
+
+
+def search_properties_admin(
+    db: Session,
+    *,
+    skip: int = 0,
+    limit: int = 20,
+    search: Optional[str] = None,
+    city: Optional[str] = None,
+    owner_id: Optional[int] = None,
+    status: Optional[str] = None,
+) -> tuple[list[Property], int]:
+    query = db.query(Property)
+    if status:
+        query = query.filter(Property.status == status.strip().upper())
+    if city:
+        query = query.filter(Property.city.ilike(f"%{city.strip()}%"))
+    if owner_id is not None:
+        query = query.filter(Property.owner_id == owner_id)
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (Property.locality.ilike(term))
+            | (Property.city.ilike(term))
+            | (Property.address.ilike(term))
+            | (Property.apartment_name.ilike(term))
+        )
+    total = query.count()
+    items = query.order_by(Property.created_at.desc()).offset(skip).limit(limit).all()
+    return items, total

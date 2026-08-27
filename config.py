@@ -26,16 +26,14 @@ class Settings(BaseSettings):
 
     # API Server Settings
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8005
+    API_PORT: int = 8024
 
-    # CORS Settings
+    # CORS Settings (Town Exchange frontend dev server)
     CORS_ORIGINS: list = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000"
+        "http://localhost:5188",
+        "http://127.0.0.1:5188",
+        "http://localhost:5190",
+        "http://127.0.0.1:5190",
     ]
 
     # API Rate Limiting (Optional)
@@ -48,6 +46,7 @@ class Settings(BaseSettings):
     # Storage Settings
     CLOUDINARY_FOLDER_PROPERTIES: str = "properties"
     CLOUDINARY_FOLDER_STORIES: str = "stories"
+    CLOUDINARY_FOLDER_ADS: str = "advertisements"
 
     # Security Settings (Optional)
     API_KEY_ENABLED: bool = False
@@ -62,6 +61,16 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "dev-only-insecure-secret-change-me"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_HOURS: int = 24 * 14
+
+    # Cashfree Secure ID / DigiLocker eKYC
+    # Leave CASHFREE_CLIENT_ID empty to use built-in demo mode (no external API calls).
+    CASHFREE_CLIENT_ID: str = ""
+    CASHFREE_CLIENT_SECRET: str = ""
+    CASHFREE_BASE_URL: str = "https://sandbox.cashfree.com/verification"
+    KYC_REDIRECT_URL: str = "http://localhost:5188/kyc/callback"
+    KYC_MODE: str = ""  # auto | demo | sandbox — empty = auto (demo if no keys)
+    # If sandbox calls fail (e.g. IP not whitelisted), fall back to local demo responses.
+    KYC_DEV_FALLBACK_DEMO: bool = True
 
     class Config:
         env_file = ".env"

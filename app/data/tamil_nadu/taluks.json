@@ -1,0 +1,1904 @@
+[
+  {
+    "id": 5983,
+    "name": "Andimadam",
+    "code": 5983,
+    "district_id": 610
+  },
+  {
+    "id": 5787,
+    "name": "Ariyalur",
+    "code": 5787,
+    "district_id": 610
+  },
+  {
+    "id": 5785,
+    "name": "Sendurai",
+    "code": 5785,
+    "district_id": 610
+  },
+  {
+    "id": 5786,
+    "name": "Udayarpalayam",
+    "code": 5786,
+    "district_id": 610
+  },
+  {
+    "id": 5706,
+    "name": "Chengalpattu",
+    "code": 5706,
+    "district_id": 730
+  },
+  {
+    "id": 5711,
+    "name": "Cheyyur",
+    "code": 5711,
+    "district_id": 730
+  },
+  {
+    "id": 5710,
+    "name": "Maduranthakam",
+    "code": 5710,
+    "district_id": 730
+  },
+  {
+    "id": 6629,
+    "name": "Pallavaram",
+    "code": 6629,
+    "district_id": 730
+  },
+  {
+    "id": 5703,
+    "name": "Tambaram",
+    "code": 5703,
+    "district_id": 730
+  },
+  {
+    "id": 5709,
+    "name": "Tirukalukundram",
+    "code": 5709,
+    "district_id": 730
+  },
+  {
+    "id": 5958,
+    "name": "Tiruporur",
+    "code": 5958,
+    "district_id": 730
+  },
+  {
+    "id": 7058,
+    "name": "Vandalur",
+    "code": 7058,
+    "district_id": 730
+  },
+  {
+    "id": 5704,
+    "name": "Alandur",
+    "code": 5704,
+    "district_id": 568
+  },
+  {
+    "id": 5700,
+    "name": "Ambattur",
+    "code": 5700,
+    "district_id": 568
+  },
+  {
+    "id": 7161,
+    "name": "Aminjikarai",
+    "code": 7161,
+    "district_id": 568
+  },
+  {
+    "id": 7163,
+    "name": "Ayanavaram",
+    "code": 7163,
+    "district_id": 568
+  },
+  {
+    "id": 7164,
+    "name": "Egmore",
+    "code": 7164,
+    "district_id": 568
+  },
+  {
+    "id": 7169,
+    "name": "Guindy",
+    "code": 7169,
+    "district_id": 568
+  },
+  {
+    "id": 7514,
+    "name": "Kolathur",
+    "code": 7514,
+    "district_id": 568
+  },
+  {
+    "id": 5981,
+    "name": "Maduravoyal",
+    "code": 5981,
+    "district_id": 568
+  },
+  {
+    "id": 7165,
+    "name": "Mambalam",
+    "code": 7165,
+    "district_id": 568
+  },
+  {
+    "id": 5701,
+    "name": "Mathavaram",
+    "code": 5701,
+    "district_id": 568
+  },
+  {
+    "id": 7170,
+    "name": "Mylapore",
+    "code": 7170,
+    "district_id": 568
+  },
+  {
+    "id": 7166,
+    "name": "Perambur",
+    "code": 7166,
+    "district_id": 568
+  },
+  {
+    "id": 7167,
+    "name": "Purasawalkam",
+    "code": 7167,
+    "district_id": 568
+  },
+  {
+    "id": 5705,
+    "name": "Sholinganallur",
+    "code": 5705,
+    "district_id": 568
+  },
+  {
+    "id": 5982,
+    "name": "Tiruvottiyur",
+    "code": 5982,
+    "district_id": 568
+  },
+  {
+    "id": 7168,
+    "name": "Tondiarpet",
+    "code": 7168,
+    "district_id": 568
+  },
+  {
+    "id": 7171,
+    "name": "Velachery",
+    "code": 7171,
+    "district_id": 568
+  },
+  {
+    "id": 6643,
+    "name": "Anaimalai",
+    "code": 6643,
+    "district_id": 569
+  },
+  {
+    "id": 5955,
+    "name": "Annur",
+    "code": 5955,
+    "district_id": 569
+  },
+  {
+    "id": 5897,
+    "name": "Coimbatore North",
+    "code": 5897,
+    "district_id": 569
+  },
+  {
+    "id": 5898,
+    "name": "Coimbatore South",
+    "code": 5898,
+    "district_id": 569
+  },
+  {
+    "id": 5956,
+    "name": "Kinathukadavu",
+    "code": 5956,
+    "district_id": 569
+  },
+  {
+    "id": 5986,
+    "name": "Madukkari",
+    "code": 5986,
+    "district_id": 569
+  },
+  {
+    "id": 5895,
+    "name": "Mettupalayam",
+    "code": 5895,
+    "district_id": 569
+  },
+  {
+    "id": 5957,
+    "name": "Perur",
+    "code": 5957,
+    "district_id": 569
+  },
+  {
+    "id": 5899,
+    "name": "Pollachi",
+    "code": 5899,
+    "district_id": 569
+  },
+  {
+    "id": 5896,
+    "name": "Sulur",
+    "code": 5896,
+    "district_id": 569
+  },
+  {
+    "id": 5900,
+    "name": "Valparai",
+    "code": 5900,
+    "district_id": 569
+  },
+  {
+    "id": 6645,
+    "name": "Bhuvanagiri",
+    "code": 6645,
+    "district_id": 570
+  },
+  {
+    "id": 5791,
+    "name": "Chidambaram",
+    "code": 5791,
+    "district_id": 570
+  },
+  {
+    "id": 5789,
+    "name": "Cuddalore",
+    "code": 5789,
+    "district_id": 570
+  },
+  {
+    "id": 5792,
+    "name": "Kattumannarkoil",
+    "code": 5792,
+    "district_id": 570
+  },
+  {
+    "id": 5790,
+    "name": "Kurinjipadi",
+    "code": 5790,
+    "district_id": 570
+  },
+  {
+    "id": 5788,
+    "name": "Panruti",
+    "code": 5788,
+    "district_id": 570
+  },
+  {
+    "id": 6646,
+    "name": "Srimushnam",
+    "code": 6646,
+    "district_id": 570
+  },
+  {
+    "id": 5794,
+    "name": "Tittakudi",
+    "code": 5794,
+    "district_id": 570
+  },
+  {
+    "id": 5953,
+    "name": "Veppur",
+    "code": 5953,
+    "district_id": 570
+  },
+  {
+    "id": 5793,
+    "name": "Virudhachalam",
+    "code": 5793,
+    "district_id": 570
+  },
+  {
+    "id": 5888,
+    "name": "Dharmapuri",
+    "code": 5888,
+    "district_id": 571
+  },
+  {
+    "id": 5886,
+    "name": "Harur",
+    "code": 5886,
+    "district_id": 571
+  },
+  {
+    "id": 6622,
+    "name": "Karimangalam",
+    "code": 6622,
+    "district_id": 571
+  },
+  {
+    "id": 6623,
+    "name": "Nallampalli",
+    "code": 6623,
+    "district_id": 571
+  },
+  {
+    "id": 5885,
+    "name": "Palakkodu",
+    "code": 5885,
+    "district_id": 571
+  },
+  {
+    "id": 5887,
+    "name": "Pappireddipatti",
+    "code": 5887,
+    "district_id": 571
+  },
+  {
+    "id": 5889,
+    "name": "Pennagaram",
+    "code": 5889,
+    "district_id": 571
+  },
+  {
+    "id": 5994,
+    "name": "Athoor",
+    "code": 5994,
+    "district_id": 572
+  },
+  {
+    "id": 5980,
+    "name": "Dindiguleast",
+    "code": 5980,
+    "district_id": 572
+  },
+  {
+    "id": 5979,
+    "name": "Dindigulwest",
+    "code": 5979,
+    "district_id": 572
+  },
+  {
+    "id": 6700,
+    "name": "Gujiliamparai",
+    "code": 6700,
+    "district_id": 572
+  },
+  {
+    "id": 5766,
+    "name": "Kodaikanal",
+    "code": 5766,
+    "district_id": 572
+  },
+  {
+    "id": 5763,
+    "name": "Natham",
+    "code": 5763,
+    "district_id": 572
+  },
+  {
+    "id": 5767,
+    "name": "Nilakkottai",
+    "code": 5767,
+    "district_id": 572
+  },
+  {
+    "id": 5761,
+    "name": "Oddanchatram",
+    "code": 5761,
+    "district_id": 572
+  },
+  {
+    "id": 5760,
+    "name": "Palani",
+    "code": 5760,
+    "district_id": 572
+  },
+  {
+    "id": 5762,
+    "name": "Vedasandur",
+    "code": 5762,
+    "district_id": 572
+  },
+  {
+    "id": 5969,
+    "name": "Anthiyur",
+    "code": 5969,
+    "district_id": 573
+  },
+  {
+    "id": 5750,
+    "name": "Bhavani",
+    "code": 5750,
+    "district_id": 573
+  },
+  {
+    "id": 5753,
+    "name": "Erode",
+    "code": 5753,
+    "district_id": 573
+  },
+  {
+    "id": 5751,
+    "name": "Gobichettipalayam",
+    "code": 5751,
+    "district_id": 573
+  },
+  {
+    "id": 6637,
+    "name": "Kodumudi",
+    "code": 6637,
+    "district_id": 573
+  },
+  {
+    "id": 6636,
+    "name": "Modakkurichi",
+    "code": 6636,
+    "district_id": 573
+  },
+  {
+    "id": 6638,
+    "name": "Nambiyur",
+    "code": 6638,
+    "district_id": 573
+  },
+  {
+    "id": 5752,
+    "name": "Perundurai",
+    "code": 5752,
+    "district_id": 573
+  },
+  {
+    "id": 5749,
+    "name": "Sathyamangalam",
+    "code": 5749,
+    "district_id": 573
+  },
+  {
+    "id": 6539,
+    "name": "Thalavadi",
+    "code": 6539,
+    "district_id": 573
+  },
+  {
+    "id": 5977,
+    "name": "Chinnasalem",
+    "code": 5977,
+    "district_id": 729
+  },
+  {
+    "id": 5734,
+    "name": "Kallakkurichi",
+    "code": 5734,
+    "district_id": 729
+  },
+  {
+    "id": 7055,
+    "name": "Kalvarayan Hills",
+    "code": 7055,
+    "district_id": 729
+  },
+  {
+    "id": 5733,
+    "name": "Sankarapuram",
+    "code": 5733,
+    "district_id": 729
+  },
+  {
+    "id": 5732,
+    "name": "Tirukkoyilur",
+    "code": 5732,
+    "district_id": 729
+  },
+  {
+    "id": 5735,
+    "name": "Ulundurpettai",
+    "code": 5735,
+    "district_id": 729
+  },
+  {
+    "id": 7405,
+    "name": "Vanapuram",
+    "code": 7405,
+    "district_id": 729
+  },
+  {
+    "id": 5707,
+    "name": "Kancheepuram",
+    "code": 5707,
+    "district_id": 574
+  },
+  {
+    "id": 7057,
+    "name": "Kundrathur",
+    "code": 7057,
+    "district_id": 574
+  },
+  {
+    "id": 5702,
+    "name": "Sriperumbudur",
+    "code": 5702,
+    "district_id": 574
+  },
+  {
+    "id": 5708,
+    "name": "Uthiramerur",
+    "code": 5708,
+    "district_id": 574
+  },
+  {
+    "id": 6626,
+    "name": "Walajabad",
+    "code": 6626,
+    "district_id": 574
+  },
+  {
+    "id": 5884,
+    "name": "Agastheeswaram",
+    "code": 5884,
+    "district_id": 575
+  },
+  {
+    "id": 5882,
+    "name": "Kalkulam",
+    "code": 5882,
+    "district_id": 575
+  },
+  {
+    "id": 6673,
+    "name": "Killiyoor",
+    "code": 6673,
+    "district_id": 575
+  },
+  {
+    "id": 6672,
+    "name": "Thiruvattar",
+    "code": 6672,
+    "district_id": 575
+  },
+  {
+    "id": 5883,
+    "name": "Thovala",
+    "code": 5883,
+    "district_id": 575
+  },
+  {
+    "id": 5881,
+    "name": "Vilavancode",
+    "code": 5881,
+    "district_id": 575
+  },
+  {
+    "id": 5768,
+    "name": "Aravakurichi",
+    "code": 5768,
+    "district_id": 576
+  },
+  {
+    "id": 5772,
+    "name": "Kadavur",
+    "code": 5772,
+    "district_id": 576
+  },
+  {
+    "id": 5769,
+    "name": "Karur",
+    "code": 5769,
+    "district_id": 576
+  },
+  {
+    "id": 5770,
+    "name": "Krishnarayapuram",
+    "code": 5770,
+    "district_id": 576
+  },
+  {
+    "id": 5771,
+    "name": "Kulithalai",
+    "code": 5771,
+    "district_id": 576
+  },
+  {
+    "id": 5985,
+    "name": "Manmangalam",
+    "code": 5985,
+    "district_id": 576
+  },
+  {
+    "id": 6676,
+    "name": "Pugalur",
+    "code": 6676,
+    "district_id": 576
+  },
+  {
+    "id": 6662,
+    "name": "Anchetty",
+    "code": 6662,
+    "district_id": 577
+  },
+  {
+    "id": 6613,
+    "name": "Bargur",
+    "code": 6613,
+    "district_id": 577
+  },
+  {
+    "id": 5892,
+    "name": "Denkanikottai",
+    "code": 5892,
+    "district_id": 577
+  },
+  {
+    "id": 5890,
+    "name": "Hosur",
+    "code": 5890,
+    "district_id": 577
+  },
+  {
+    "id": 5891,
+    "name": "Krishnagiri",
+    "code": 5891,
+    "district_id": 577
+  },
+  {
+    "id": 5893,
+    "name": "Pochampalli",
+    "code": 5893,
+    "district_id": 577
+  },
+  {
+    "id": 6641,
+    "name": "Shoolagiri",
+    "code": 6641,
+    "district_id": 577
+  },
+  {
+    "id": 5894,
+    "name": "Uthangarai",
+    "code": 5894,
+    "district_id": 577
+  },
+  {
+    "id": 6615,
+    "name": "Kalligudi",
+    "code": 6615,
+    "district_id": 578
+  },
+  {
+    "id": 5960,
+    "name": "Madurai East",
+    "code": 5960,
+    "district_id": 578
+  },
+  {
+    "id": 5836,
+    "name": "Madurai North",
+    "code": 5836,
+    "district_id": 578
+  },
+  {
+    "id": 5841,
+    "name": "Madurai South",
+    "code": 5841,
+    "district_id": 578
+  },
+  {
+    "id": 5961,
+    "name": "Madurai West",
+    "code": 5961,
+    "district_id": 578
+  },
+  {
+    "id": 5835,
+    "name": "Melur",
+    "code": 5835,
+    "district_id": 578
+  },
+  {
+    "id": 5839,
+    "name": "Peraiyur",
+    "code": 5839,
+    "district_id": 578
+  },
+  {
+    "id": 5840,
+    "name": "Thirumangalam",
+    "code": 5840,
+    "district_id": 578
+  },
+  {
+    "id": 5962,
+    "name": "Thirupparankundram",
+    "code": 5962,
+    "district_id": 578
+  },
+  {
+    "id": 5838,
+    "name": "Usilampatti",
+    "code": 5838,
+    "district_id": 578
+  },
+  {
+    "id": 5837,
+    "name": "Vadipatti",
+    "code": 5837,
+    "district_id": 578
+  },
+  {
+    "id": 5797,
+    "name": "Kuthalam",
+    "code": 5797,
+    "district_id": 735
+  },
+  {
+    "id": 5796,
+    "name": "Mayiladuthurai",
+    "code": 5796,
+    "district_id": 735
+  },
+  {
+    "id": 5795,
+    "name": "Sirkali",
+    "code": 5795,
+    "district_id": 735
+  },
+  {
+    "id": 5798,
+    "name": "Tharangambadi",
+    "code": 5798,
+    "district_id": 735
+  },
+  {
+    "id": 5800,
+    "name": "Kilvelur",
+    "code": 5800,
+    "district_id": 579
+  },
+  {
+    "id": 5799,
+    "name": "Nagapattinam",
+    "code": 5799,
+    "district_id": 579
+  },
+  {
+    "id": 5801,
+    "name": "Thirukkuvalai",
+    "code": 5801,
+    "district_id": 579
+  },
+  {
+    "id": 5802,
+    "name": "Vedaranyam",
+    "code": 5802,
+    "district_id": 579
+  },
+  {
+    "id": 6625,
+    "name": "Kolli Hills",
+    "code": 6625,
+    "district_id": 580
+  },
+  {
+    "id": 6634,
+    "name": "Kumarapalayam",
+    "code": 6634,
+    "district_id": 580
+  },
+  {
+    "id": 6635,
+    "name": "Mohanur",
+    "code": 6635,
+    "district_id": 580
+  },
+  {
+    "id": 5747,
+    "name": "Namakkal",
+    "code": 5747,
+    "district_id": 580
+  },
+  {
+    "id": 5748,
+    "name": "Paramathi-Velur",
+    "code": 5748,
+    "district_id": 580
+  },
+  {
+    "id": 5746,
+    "name": "Rasipuram",
+    "code": 5746,
+    "district_id": 580
+  },
+  {
+    "id": 6632,
+    "name": "Sendamangalam",
+    "code": 6632,
+    "district_id": 580
+  },
+  {
+    "id": 5745,
+    "name": "Tiruchengode",
+    "code": 5745,
+    "district_id": 580
+  },
+  {
+    "id": 5951,
+    "name": "Alathur",
+    "code": 5951,
+    "district_id": 581
+  },
+  {
+    "id": 5976,
+    "name": "Kunnam",
+    "code": 5976,
+    "district_id": 581
+  },
+  {
+    "id": 5973,
+    "name": "Perambalur",
+    "code": 5973,
+    "district_id": 581
+  },
+  {
+    "id": 5974,
+    "name": "Veppanthattai",
+    "code": 5974,
+    "district_id": 581
+  },
+  {
+    "id": 5824,
+    "name": "Alangudi",
+    "code": 5824,
+    "district_id": 582
+  },
+  {
+    "id": 5826,
+    "name": "Aranthangi",
+    "code": 5826,
+    "district_id": 582
+  },
+  {
+    "id": 5828,
+    "name": "Avudayarkoil",
+    "code": 5828,
+    "district_id": 582
+  },
+  {
+    "id": 5820,
+    "name": "Gandarvakkottai",
+    "code": 5820,
+    "district_id": 582
+  },
+  {
+    "id": 5818,
+    "name": "Iluppur",
+    "code": 5818,
+    "district_id": 582
+  },
+  {
+    "id": 5825,
+    "name": "Karambakudi",
+    "code": 5825,
+    "district_id": 582
+  },
+  {
+    "id": 5819,
+    "name": "Kulathur",
+    "code": 5819,
+    "district_id": 582
+  },
+  {
+    "id": 5827,
+    "name": "Manamelkudi",
+    "code": 5827,
+    "district_id": 582
+  },
+  {
+    "id": 5823,
+    "name": "Ponnamaravathi",
+    "code": 5823,
+    "district_id": 582
+  },
+  {
+    "id": 5821,
+    "name": "Pudukkottai",
+    "code": 5821,
+    "district_id": 582
+  },
+  {
+    "id": 5822,
+    "name": "Thirumayam",
+    "code": 5822,
+    "district_id": 582
+  },
+  {
+    "id": 6614,
+    "name": "Viralimalai",
+    "code": 6614,
+    "district_id": 582
+  },
+  {
+    "id": 5859,
+    "name": "Kadaladi",
+    "code": 5859,
+    "district_id": 583
+  },
+  {
+    "id": 5858,
+    "name": "Kamuthi",
+    "code": 5858,
+    "district_id": 583
+  },
+  {
+    "id": 6654,
+    "name": "Kilakarai",
+    "code": 6654,
+    "district_id": 583
+  },
+  {
+    "id": 5857,
+    "name": "Mudukulathur",
+    "code": 5857,
+    "district_id": 583
+  },
+  {
+    "id": 5856,
+    "name": "Paramakudi",
+    "code": 5856,
+    "district_id": 583
+  },
+  {
+    "id": 6653,
+    "name": "Rajasingamangalam",
+    "code": 6653,
+    "district_id": 583
+  },
+  {
+    "id": 5860,
+    "name": "Ramanathapuram",
+    "code": 5860,
+    "district_id": 583
+  },
+  {
+    "id": 5861,
+    "name": "Rameswaram",
+    "code": 5861,
+    "district_id": 583
+  },
+  {
+    "id": 5855,
+    "name": "Tiruvadanai",
+    "code": 5855,
+    "district_id": 583
+  },
+  {
+    "id": 5715,
+    "name": "Arakonam",
+    "code": 5715,
+    "district_id": 731
+  },
+  {
+    "id": 5716,
+    "name": "Arcot",
+    "code": 5716,
+    "district_id": 731
+  },
+  {
+    "id": 7059,
+    "name": "Kalavai",
+    "code": 7059,
+    "district_id": 731
+  },
+  {
+    "id": 6664,
+    "name": "Nemili",
+    "code": 6664,
+    "district_id": 731
+  },
+  {
+    "id": 7060,
+    "name": "Sholinghur",
+    "code": 7060,
+    "district_id": 731
+  },
+  {
+    "id": 5714,
+    "name": "Wallajah",
+    "code": 5714,
+    "district_id": 731
+  },
+  {
+    "id": 5743,
+    "name": "Attur",
+    "code": 5743,
+    "district_id": 584
+  },
+  {
+    "id": 5738,
+    "name": "Edappadi",
+    "code": 5738,
+    "district_id": 584
+  },
+  {
+    "id": 5744,
+    "name": "Gangavalli",
+    "code": 5744,
+    "district_id": 584
+  },
+  {
+    "id": 6619,
+    "name": "Kadayampatti",
+    "code": 6619,
+    "district_id": 584
+  },
+  {
+    "id": 5736,
+    "name": "Mettur",
+    "code": 5736,
+    "district_id": 584
+  },
+  {
+    "id": 5737,
+    "name": "Omalur",
+    "code": 5737,
+    "district_id": 584
+  },
+  {
+    "id": 6618,
+    "name": "Pethanaickanpalayam",
+    "code": 6618,
+    "district_id": 584
+  },
+  {
+    "id": 5740,
+    "name": "Salem",
+    "code": 5740,
+    "district_id": 584
+  },
+  {
+    "id": 5970,
+    "name": "Salem South",
+    "code": 5970,
+    "district_id": 584
+  },
+  {
+    "id": 5971,
+    "name": "Salem West",
+    "code": 5971,
+    "district_id": 584
+  },
+  {
+    "id": 5739,
+    "name": "Sankari",
+    "code": 5739,
+    "district_id": 584
+  },
+  {
+    "id": 7120,
+    "name": "Thalaivasal",
+    "code": 7120,
+    "district_id": 584
+  },
+  {
+    "id": 5742,
+    "name": "Vazhapadi",
+    "code": 5742,
+    "district_id": 584
+  },
+  {
+    "id": 5741,
+    "name": "Yercaud",
+    "code": 5741,
+    "district_id": 584
+  },
+  {
+    "id": 5831,
+    "name": "Devakottai",
+    "code": 5831,
+    "district_id": 585
+  },
+  {
+    "id": 5834,
+    "name": "Ilayangudi",
+    "code": 5834,
+    "district_id": 585
+  },
+  {
+    "id": 6644,
+    "name": "Kalaiyarkoil",
+    "code": 6644,
+    "district_id": 585
+  },
+  {
+    "id": 5830,
+    "name": "Karaikkudi",
+    "code": 5830,
+    "district_id": 585
+  },
+  {
+    "id": 5833,
+    "name": "Manamadurai",
+    "code": 5833,
+    "district_id": 585
+  },
+  {
+    "id": 5995,
+    "name": "Singampunari",
+    "code": 5995,
+    "district_id": 585
+  },
+  {
+    "id": 5832,
+    "name": "Sivaganga",
+    "code": 5832,
+    "district_id": 585
+  },
+  {
+    "id": 5829,
+    "name": "Thiruppathur",
+    "code": 5829,
+    "district_id": 585
+  },
+  {
+    "id": 5965,
+    "name": "Thiruppuvanam",
+    "code": 5965,
+    "district_id": 585
+  },
+  {
+    "id": 5875,
+    "name": "Alangulam",
+    "code": 5875,
+    "district_id": 733
+  },
+  {
+    "id": 6639,
+    "name": "Kadayanallur",
+    "code": 6639,
+    "district_id": 733
+  },
+  {
+    "id": 5871,
+    "name": "Sankarankoil",
+    "code": 5871,
+    "district_id": 733
+  },
+  {
+    "id": 5874,
+    "name": "Shenkottai",
+    "code": 5874,
+    "district_id": 733
+  },
+  {
+    "id": 5870,
+    "name": "Sivagiri",
+    "code": 5870,
+    "district_id": 733
+  },
+  {
+    "id": 5873,
+    "name": "Tenkasi",
+    "code": 5873,
+    "district_id": 733
+  },
+  {
+    "id": 6642,
+    "name": "Tiruvengadam",
+    "code": 6642,
+    "district_id": 733
+  },
+  {
+    "id": 5872,
+    "name": "Veerakeralamputhur",
+    "code": 5872,
+    "district_id": 733
+  },
+  {
+    "id": 5966,
+    "name": "Budalur",
+    "code": 5966,
+    "district_id": 586
+  },
+  {
+    "id": 5811,
+    "name": "Kumbakonam",
+    "code": 5811,
+    "district_id": 586
+  },
+  {
+    "id": 5815,
+    "name": "Orathanadu",
+    "code": 5815,
+    "district_id": 586
+  },
+  {
+    "id": 5812,
+    "name": "Papanasam",
+    "code": 5812,
+    "district_id": 586
+  },
+  {
+    "id": 5816,
+    "name": "Pattukkottai",
+    "code": 5816,
+    "district_id": 586
+  },
+  {
+    "id": 5817,
+    "name": "Peravurani",
+    "code": 5817,
+    "district_id": 586
+  },
+  {
+    "id": 5814,
+    "name": "Thanjavur",
+    "code": 5814,
+    "district_id": 586
+  },
+  {
+    "id": 5813,
+    "name": "Thiruvaiyaru",
+    "code": 5813,
+    "district_id": 586
+  },
+  {
+    "id": 5810,
+    "name": "Thiruvidaimarudur",
+    "code": 5810,
+    "district_id": 586
+  },
+  {
+    "id": 7406,
+    "name": "Thiruvonam",
+    "code": 7406,
+    "district_id": 586
+  },
+  {
+    "id": 5758,
+    "name": "Coonoor",
+    "code": 5758,
+    "district_id": 587
+  },
+  {
+    "id": 5755,
+    "name": "Gudalur",
+    "code": 5755,
+    "district_id": 587
+  },
+  {
+    "id": 5757,
+    "name": "Kotagiri",
+    "code": 5757,
+    "district_id": 587
+  },
+  {
+    "id": 5759,
+    "name": "Kundah",
+    "code": 5759,
+    "district_id": 587
+  },
+  {
+    "id": 5754,
+    "name": "Panthalur",
+    "code": 5754,
+    "district_id": 587
+  },
+  {
+    "id": 5756,
+    "name": "Udhagamandalam",
+    "code": 5756,
+    "district_id": 587
+  },
+  {
+    "id": 5846,
+    "name": "Andipatti",
+    "code": 5846,
+    "district_id": 588
+  },
+  {
+    "id": 5842,
+    "name": "Bodinayakanur",
+    "code": 5842,
+    "district_id": 588
+  },
+  {
+    "id": 5843,
+    "name": "Periyakulam",
+    "code": 5843,
+    "district_id": 588
+  },
+  {
+    "id": 5844,
+    "name": "Theni",
+    "code": 5844,
+    "district_id": 588
+  },
+  {
+    "id": 5845,
+    "name": "Uthamapalayam",
+    "code": 5845,
+    "district_id": 588
+  },
+  {
+    "id": 6621,
+    "name": "Avadi",
+    "code": 6621,
+    "district_id": 589
+  },
+  {
+    "id": 5693,
+    "name": "Gummidipoondi",
+    "code": 5693,
+    "district_id": 589
+  },
+  {
+    "id": 5697,
+    "name": "Pallipattu",
+    "code": 5697,
+    "district_id": 589
+  },
+  {
+    "id": 5694,
+    "name": "Ponneri",
+    "code": 5694,
+    "district_id": 589
+  },
+  {
+    "id": 5699,
+    "name": "Poonamallee",
+    "code": 5699,
+    "district_id": 589
+  },
+  {
+    "id": 6674,
+    "name": "R K Pet",
+    "code": 6674,
+    "district_id": 589
+  },
+  {
+    "id": 5698,
+    "name": "Thiruvallur",
+    "code": 5698,
+    "district_id": 589
+  },
+  {
+    "id": 5696,
+    "name": "Tiruttani",
+    "code": 5696,
+    "district_id": 589
+  },
+  {
+    "id": 5695,
+    "name": "Uthukkottai",
+    "code": 5695,
+    "district_id": 589
+  },
+  {
+    "id": 6627,
+    "name": "Koothanallur",
+    "code": 6627,
+    "district_id": 590
+  },
+  {
+    "id": 5804,
+    "name": "Kudavasal",
+    "code": 5804,
+    "district_id": 590
+  },
+  {
+    "id": 5808,
+    "name": "Mannargudi",
+    "code": 5808,
+    "district_id": 590
+  },
+  {
+    "id": 7408,
+    "name": "Muthupettai",
+    "code": 7408,
+    "district_id": 590
+  },
+  {
+    "id": 5805,
+    "name": "Nannilam",
+    "code": 5805,
+    "district_id": 590
+  },
+  {
+    "id": 5807,
+    "name": "Needamangalam",
+    "code": 5807,
+    "district_id": 590
+  },
+  {
+    "id": 5809,
+    "name": "Thiruthuraipoondi",
+    "code": 5809,
+    "district_id": 590
+  },
+  {
+    "id": 5806,
+    "name": "Thiruvarur",
+    "code": 5806,
+    "district_id": 590
+  },
+  {
+    "id": 5803,
+    "name": "Valangaiman",
+    "code": 5803,
+    "district_id": 590
+  },
+  {
+    "id": 6633,
+    "name": "Eral",
+    "code": 6633,
+    "district_id": 594
+  },
+  {
+    "id": 5863,
+    "name": "Ettayapuram",
+    "code": 5863,
+    "district_id": 594
+  },
+  {
+    "id": 6628,
+    "name": "Kayathar",
+    "code": 6628,
+    "district_id": 594
+  },
+  {
+    "id": 5862,
+    "name": "Kovilpatti",
+    "code": 5862,
+    "district_id": 594
+  },
+  {
+    "id": 5865,
+    "name": "Ottapidaram",
+    "code": 5865,
+    "district_id": 594
+  },
+  {
+    "id": 5869,
+    "name": "Sathankulam",
+    "code": 5869,
+    "district_id": 594
+  },
+  {
+    "id": 5867,
+    "name": "Srivaikuntam",
+    "code": 5867,
+    "district_id": 594
+  },
+  {
+    "id": 5866,
+    "name": "Thoothukkudi",
+    "code": 5866,
+    "district_id": 594
+  },
+  {
+    "id": 5868,
+    "name": "Tiruchendur",
+    "code": 5868,
+    "district_id": 594
+  },
+  {
+    "id": 5864,
+    "name": "Vilathikulam",
+    "code": 5864,
+    "district_id": 594
+  },
+  {
+    "id": 5777,
+    "name": "Lalgudi",
+    "code": 5777,
+    "district_id": 591
+  },
+  {
+    "id": 5776,
+    "name": "Manachanallur",
+    "code": 5776,
+    "district_id": 591
+  },
+  {
+    "id": 5781,
+    "name": "Manapparai",
+    "code": 5781,
+    "district_id": 591
+  },
+  {
+    "id": 5954,
+    "name": "Marungapuri",
+    "code": 5954,
+    "district_id": 591
+  },
+  {
+    "id": 5774,
+    "name": "Musiri",
+    "code": 5774,
+    "district_id": 591
+  },
+  {
+    "id": 5778,
+    "name": "Srirangam",
+    "code": 5778,
+    "district_id": 591
+  },
+  {
+    "id": 5780,
+    "name": "Thiruverumbur",
+    "code": 5780,
+    "district_id": 591
+  },
+  {
+    "id": 5773,
+    "name": "Thottiyam",
+    "code": 5773,
+    "district_id": 591
+  },
+  {
+    "id": 5775,
+    "name": "Thuraiyur",
+    "code": 5775,
+    "district_id": 591
+  },
+  {
+    "id": 6620,
+    "name": "Tiruchirappalli East",
+    "code": 6620,
+    "district_id": 591
+  },
+  {
+    "id": 5779,
+    "name": "Tiruchirappalli West",
+    "code": 5779,
+    "district_id": 591
+  },
+  {
+    "id": 5878,
+    "name": "Ambasamudram",
+    "code": 5878,
+    "district_id": 592
+  },
+  {
+    "id": 6648,
+    "name": "Cheranmahadevi",
+    "code": 6648,
+    "district_id": 592
+  },
+  {
+    "id": 6647,
+    "name": "Manur",
+    "code": 6647,
+    "district_id": 592
+  },
+  {
+    "id": 5879,
+    "name": "Nanguneri",
+    "code": 5879,
+    "district_id": 592
+  },
+  {
+    "id": 5877,
+    "name": "Palayamkottai",
+    "code": 5877,
+    "district_id": 592
+  },
+  {
+    "id": 5880,
+    "name": "Radhapuram",
+    "code": 5880,
+    "district_id": 592
+  },
+  {
+    "id": 5876,
+    "name": "Tirunelveli",
+    "code": 5876,
+    "district_id": 592
+  },
+  {
+    "id": 6649,
+    "name": "Tisayanvilai",
+    "code": 6649,
+    "district_id": 592
+  },
+  {
+    "id": 5719,
+    "name": "Ambur",
+    "code": 5719,
+    "district_id": 732
+  },
+  {
+    "id": 5963,
+    "name": "Natrampalli",
+    "code": 5963,
+    "district_id": 732
+  },
+  {
+    "id": 5720,
+    "name": "Tirupathur",
+    "code": 5720,
+    "district_id": 732
+  },
+  {
+    "id": 5718,
+    "name": "Vaniyambadi",
+    "code": 5718,
+    "district_id": 732
+  },
+  {
+    "id": 5903,
+    "name": "Avinashi",
+    "code": 5903,
+    "district_id": 634
+  },
+  {
+    "id": 5902,
+    "name": "Dharapuram",
+    "code": 5902,
+    "district_id": 634
+  },
+  {
+    "id": 5901,
+    "name": "Kangeyam",
+    "code": 5901,
+    "district_id": 634
+  },
+  {
+    "id": 5907,
+    "name": "Madathukulam",
+    "code": 5907,
+    "district_id": 634
+  },
+  {
+    "id": 5905,
+    "name": "Palladam",
+    "code": 5905,
+    "district_id": 634
+  },
+  {
+    "id": 5967,
+    "name": "Tiruppurnorth",
+    "code": 5967,
+    "district_id": 634
+  },
+  {
+    "id": 5968,
+    "name": "Tiruppursouth",
+    "code": 5968,
+    "district_id": 634
+  },
+  {
+    "id": 5906,
+    "name": "Udumalaipettai",
+    "code": 5906,
+    "district_id": 634
+  },
+  {
+    "id": 6616,
+    "name": "Uthukuli",
+    "code": 6616,
+    "district_id": 634
+  },
+  {
+    "id": 5721,
+    "name": "Arani",
+    "code": 5721,
+    "district_id": 593
+  },
+  {
+    "id": 5725,
+    "name": "Chengam",
+    "code": 5725,
+    "district_id": 593
+  },
+  {
+    "id": 6617,
+    "name": "Chetpet",
+    "code": 6617,
+    "district_id": 593
+  },
+  {
+    "id": 5722,
+    "name": "Cheyyar",
+    "code": 5722,
+    "district_id": 593
+  },
+  {
+    "id": 6631,
+    "name": "Jamunamarathoor",
+    "code": 6631,
+    "district_id": 593
+  },
+  {
+    "id": 5959,
+    "name": "Kalasapakkam",
+    "code": 5959,
+    "district_id": 593
+  },
+  {
+    "id": 6630,
+    "name": "Kilpennathur",
+    "code": 6630,
+    "district_id": 593
+  },
+  {
+    "id": 5724,
+    "name": "Polur",
+    "code": 5724,
+    "district_id": 593
+  },
+  {
+    "id": 5726,
+    "name": "Thandrampet",
+    "code": 5726,
+    "district_id": 593
+  },
+  {
+    "id": 5727,
+    "name": "Tiruvannamalai",
+    "code": 5727,
+    "district_id": 593
+  },
+  {
+    "id": 5723,
+    "name": "Vandavasi",
+    "code": 5723,
+    "district_id": 593
+  },
+  {
+    "id": 6624,
+    "name": "Vembakkam",
+    "code": 6624,
+    "district_id": 593
+  },
+  {
+    "id": 5964,
+    "name": "Anaicut",
+    "code": 5964,
+    "district_id": 595
+  },
+  {
+    "id": 5712,
+    "name": "Gudiyatham",
+    "code": 5712,
+    "district_id": 595
+  },
+  {
+    "id": 7052,
+    "name": "K V Kuppam",
+    "code": 7052,
+    "district_id": 595
+  },
+  {
+    "id": 5713,
+    "name": "Katpadi",
+    "code": 5713,
+    "district_id": 595
+  },
+  {
+    "id": 6663,
+    "name": "Pernambut",
+    "code": 6663,
+    "district_id": 595
+  },
+  {
+    "id": 5717,
+    "name": "Vellore",
+    "code": 5717,
+    "district_id": 595
+  },
+  {
+    "id": 5728,
+    "name": "Gingee",
+    "code": 5728,
+    "district_id": 596
+  },
+  {
+    "id": 6651,
+    "name": "Kandachipuram",
+    "code": 6651,
+    "district_id": 596
+  },
+  {
+    "id": 6650,
+    "name": "Marakanam",
+    "code": 6650,
+    "district_id": 596
+  },
+  {
+    "id": 6652,
+    "name": "Melmalaiyanur",
+    "code": 6652,
+    "district_id": 596
+  },
+  {
+    "id": 7053,
+    "name": "Thiruvennainallur",
+    "code": 7053,
+    "district_id": 596
+  },
+  {
+    "id": 5729,
+    "name": "Tindivanam",
+    "code": 5729,
+    "district_id": 596
+  },
+  {
+    "id": 5730,
+    "name": "Vanur",
+    "code": 5730,
+    "district_id": 596
+  },
+  {
+    "id": 5978,
+    "name": "Vikravandi",
+    "code": 5978,
+    "district_id": 596
+  },
+  {
+    "id": 5731,
+    "name": "Viluppuram",
+    "code": 5731,
+    "district_id": 596
+  },
+  {
+    "id": 5853,
+    "name": "Aruppukkottai",
+    "code": 5853,
+    "district_id": 597
+  },
+  {
+    "id": 5851,
+    "name": "Kariapatti",
+    "code": 5851,
+    "district_id": 597
+  },
+  {
+    "id": 5847,
+    "name": "Rajapalayam",
+    "code": 5847,
+    "district_id": 597
+  },
+  {
+    "id": 5854,
+    "name": "Sattur",
+    "code": 5854,
+    "district_id": 597
+  },
+  {
+    "id": 5849,
+    "name": "Sivakasi",
+    "code": 5849,
+    "district_id": 597
+  },
+  {
+    "id": 5848,
+    "name": "Srivilliputhur",
+    "code": 5848,
+    "district_id": 597
+  },
+  {
+    "id": 5852,
+    "name": "Tiruchuli",
+    "code": 5852,
+    "district_id": 597
+  },
+  {
+    "id": 6640,
+    "name": "Vembakottai",
+    "code": 6640,
+    "district_id": 597
+  },
+  {
+    "id": 5850,
+    "name": "Virudhunagar",
+    "code": 5850,
+    "district_id": 597
+  },
+  {
+    "id": 6675,
+    "name": "Watrap",
+    "code": 6675,
+    "district_id": 597
+  }
+]

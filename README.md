@@ -186,7 +186,7 @@ Make sure `(venv)` is still active in your terminal.
 Run:
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8024
 ```
 
 You should see a message like: `Starting Town Exchange API...`
@@ -199,13 +199,13 @@ You should see a message like: `Starting Town Exchange API...`
 
 Open your browser and visit these links:
 
-1. http://localhost:8000  
+1. http://localhost:8024  
    → Should show a JSON response with `"status": "running"`
 
-2. http://localhost:8000/health  
+2. http://localhost:8024/health  
    → Should show `"status": "healthy"` and `"database": "connected"`
 
-3. http://localhost:8000/docs  
+3. http://localhost:8024/docs  
    → Should show the API documentation page (Swagger UI)
 
 If all 3 work, your backend setup is complete.
@@ -220,7 +220,7 @@ Every new terminal session:
 cd Town_X-BE
 .\venv\Scripts\Activate.ps1       # Windows
 # source venv/bin/activate        # macOS / Linux
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8024
 ```
 
 ---
@@ -233,7 +233,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 **Server won't start — Cloudinary error**  
 → Check that `.env` exists in `Town_X-BE` and all 3 Cloudinary values are correct with no extra spaces.
 
-**Port 8000 already in use**  
+**Port 8024 already in use**  
 → Another app is using that port. Stop it, or start on a different port:  
 `uvicorn main:app --reload --port 8001`
 
@@ -277,7 +277,7 @@ Main endpoints:
 - `GET /api/favourites` — list saved properties
 - `GET /api/landing-config` — landing page settings
 
-Full docs: http://localhost:8000/docs
+Full docs: http://localhost:8024/docs
 
 ---
 

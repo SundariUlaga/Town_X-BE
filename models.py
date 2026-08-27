@@ -23,6 +23,16 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="buyer")  # 'buyer' | 'owner' | 'admin'
 
+    # eKYC / DigiLocker (Cashfree Secure ID)
+    kyc_status = Column(String, nullable=False, default="pending")  # pending | in_progress | verified | failed
+    kyc_verification_id = Column(String, nullable=True, index=True)
+    kyc_reference_id = Column(Integer, nullable=True)
+    kyc_mobile = Column(String, nullable=True)
+    kyc_digilocker_id = Column(String, nullable=True)
+    kyc_verified_at = Column(DateTime, nullable=True)
+
+    phone = Column(String, nullable=True, unique=True, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -86,8 +96,19 @@ class Property(Base):
     # Images (stored as JSON array from Cloudinary)
     images = Column(JSON, nullable=True)
 
-    # Favourite Status
+    # Favourite Status (legacy global flag — prefer UserFavourite)
     is_favourite = Column(Boolean, default=False, index=True)
+
+    # Moderation lifecycle
+    status = Column(String, nullable=False, default="PUBLISHED", index=True)
+    admin_notes = Column(Text, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+
+    # Document / land verification (independent of publish status)
+    title_deed_url = Column(String, nullable=True)
+    survey_parcel_number = Column(String, nullable=True)
+    encumbrance_certificate_status = Column(String, nullable=True)
+    verification_tier = Column(String, nullable=False, default="unverified", index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -161,3 +182,178 @@ class StoryView(Base):
 
     def __repr__(self):
         return f"<StoryView {self.id}: Story {self.story_id}>"
+
+
+class SupportQuestion(Base):
+    """User-submitted support / Q&A ticket (verified users only)."""
+    __tablename__ = "support_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    subject = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="open")  # open | answered | closed
+    admin_reply = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    answered_at = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<SupportQuestion {self.id}: user={self.user_id} status={self.status}>"
+
+
+class SavedSearch(Base):
+    """User saved property search — used for match alerts."""
+    __tablename__ = "saved_searches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    label = Column(String, nullable=False)
+    criteria = Column(JSON, nullable=False)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<SavedSearch {self.id}: user={self.user_id} label={self.label}>"
+
+
+class Notification(Base):
+    """In-app notification for a user."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
+    saved_search_id = Column(Integer, ForeignKey("saved_searches.id"), nullable=True)
+    payload = Column(JSON, nullable=True)
+    is_read = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    def __repr__(self):
+        return f"<Notification {self.id}: user={self.user_id} type={self.type} read={self.is_read}>"
+
+
+class Advertisement(Base):
+    """Property/project advertisement with admin review lifecycle."""
+    __tablename__ = "advertisements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
+
+    ad_type = Column(String, nullable=False, default="property")  # property | project | general
+    title = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    property_type = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    price_text = Column(String, nullable=True)
+    selling_point = Column(String, nullable=True)
+    badge_text = Column(String, nullable=True, default="FEATURED PROJECT")
+    button_text = Column(String, nullable=False, default="View Details")
+    contact_phone = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+
+    banner_url = Column(String, nullable=True)
+    banner_public_id = Column(String, nullable=True)
+
+    status = Column(String, nullable=False, default="PENDING_REVIEW", index=True)
+    admin_notes = Column(Text, nullable=True)
+    created_by_admin = Column(Boolean, default=False)
+
+    display_position = Column(Integer, nullable=False, default=99, index=True)
+    show_on_homepage = Column(Boolean, default=True, index=True)
+    start_date = Column(DateTime, nullable=True, index=True)
+    end_date = Column(DateTime, nullable=True, index=True)
+
+    impressions = Column(Integer, default=0)
+    views = Column(Integer, default=0)
+    clicks = Column(Integer, default=0)
+    enquiries = Column(Integer, default=0)
+
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Advertisement {self.id}: {self.title} status={self.status}>"
+
+
+class PropertyReviewNote(Base):
+    """Historical admin feedback rounds on a property listing."""
+    __tablename__ = "property_review_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    admin_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    note_type = Column(String, nullable=False, index=True)  # reject | changes_requested
+    note = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class UserFavourite(Base):
+    __tablename__ = "user_favourites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class UserActivity(Base):
+    __tablename__ = "user_activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    activity_type = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=True)
+    entity_id = Column(Integer, nullable=True)
+    location_text = Column(String, nullable=True)
+    property_type = Column(String, nullable=True)
+    transaction_type = Column(String, nullable=True)
+    search_query = Column(String, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PropertyEnquiry(Base):
+    __tablename__ = "property_enquiries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    contact_method = Column(String, nullable=False, default="phone")
+    status = Column(String, nullable=False, default="NEW", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PropertyReport(Base):
+    __tablename__ = "property_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    reported_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    reason = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="OPEN", index=True)
+    admin_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    resolved_at = Column(DateTime, nullable=True)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    old_value = Column(JSON, nullable=True)
+    new_value = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

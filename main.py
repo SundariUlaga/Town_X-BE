@@ -21,6 +21,9 @@ from schemas import (
     UserLogin,
     UserResponse,
     TokenResponse,
+    SendOtpRequest,
+    SendOtpResponse,
+    VerifyOtpRequest,
 )
 from utils.cloudinary_config import upload_multiple_images, delete_multiple_images
 from config import settings, validate_file_extension, get_max_file_size, is_video_file
@@ -30,7 +33,20 @@ from auth import (
     create_access_token,
     get_current_user,
     get_optional_current_user,
+    require_kyc_verified,
 )
+from app.api.locations import router as locations_router
+from app.api.kyc import router as kyc_router
+from app.api.account import router as account_router
+from app.api.notifications import router as notifications_router
+from app.api.advertisements import router as advertisements_router
+from app.api.admin import router as admin_router
+from app.api.activity import router as activity_router
+from app.api.recommendations import router as recommendations_router
+from app.api.enquiries import router as enquiries_router
+from app.api.reports import router as reports_router
+from services.phone_otp import DEMO_OTP, default_display_name, normalize_phone, phone_email, unusable_password_hash
+from services.property_serialize import serialize_property
 import crud
 
 # Configure logging
@@ -68,6 +84,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(locations_router)
+app.include_router(kyc_router)
+app.include_router(account_router)
+app.include_router(notifications_router)
+app.include_router(advertisements_router)
+app.include_router(admin_router)
+app.include_router(activity_router)
+app.include_router(recommendations_router)
+app.include_router(enquiries_router)
+app.include_router(reports_router)
+
 
 # ========================================
 # STARTUP & SHUTDOWN EVENTS
@@ -77,6 +104,19 @@ app.add_middleware(
 async def startup_event():
     """Run on app startup - Initialize background tasks"""
     logger.info("🚀 Starting Town Exchange API...")
+
+    try:
+        from services.cashfree_kyc import effective_kyc_mode, resolve_kyc_mode
+
+        kyc_mode = resolve_kyc_mode()
+        logger.info(
+            "KYC configured — mode=%s effective=%s redirect=%s",
+            kyc_mode,
+            effective_kyc_mode(),
+            settings.KYC_REDIRECT_URL,
+        )
+    except Exception as e:
+        logger.warning("KYC startup check skipped: %s", e)
 
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
@@ -93,12 +133,28 @@ async def startup_event():
             finally:
                 db.close()
 
+        def refresh_advertisement_statuses_job():
+            db = next(get_db())
+            try:
+                changed = crud.refresh_advertisement_statuses(db)
+                if changed > 0:
+                    logger.info("✅ Refreshed %s advertisement status(es)", changed)
+            except Exception as e:
+                logger.error("❌ Error refreshing advertisement statuses: %s", e)
+            finally:
+                db.close()
+
         # Start scheduler
         scheduler = BackgroundScheduler()
         scheduler.add_job(
             cleanup_expired_stories_job,
             'interval',
             hours=settings.CLEANUP_INTERVAL_HOURS
+        )
+        scheduler.add_job(
+            refresh_advertisement_statuses_job,
+            'interval',
+            hours=1,
         )
         scheduler.start()
         logger.info(
@@ -145,6 +201,7 @@ async def root():
             "properties": "/api/properties",
             "stories": "/api/stories",
             "config": "/api/landing-config",
+            "locations": "/api/locations/districts",
             "docs": "/docs"
         }
     }
@@ -207,6 +264,60 @@ async def login_endpoint(payload: UserLogin, db: Session = Depends(get_db)):
     return TokenResponse(access_token=token, user=user)
 
 
+@app.post("/api/auth/send-otp", response_model=SendOtpResponse)
+async def send_otp_endpoint(payload: SendOtpRequest, db: Session = Depends(get_db)):
+    """Send OTP to mobile (prototype: always succeeds, use 000000 to verify)."""
+    phone = normalize_phone(payload.phone)
+    if len(phone) != 10:
+        raise HTTPException(status_code=400, detail="Enter a valid 10-digit mobile number")
+    existing = crud.get_user_by_phone(db, phone) is not None
+    logger.info(
+        "OTP requested for phone ending %s (demo OTP: %s, existing=%s)",
+        phone[-4:],
+        DEMO_OTP,
+        existing,
+    )
+    return SendOtpResponse(phone=phone, is_existing_user=existing)
+
+
+@app.post("/api/auth/verify-otp", response_model=TokenResponse)
+async def verify_otp_endpoint(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
+    """Verify OTP and sign in — creates account automatically if phone is new."""
+    phone = normalize_phone(payload.phone)
+    if len(phone) != 10:
+        raise HTTPException(status_code=400, detail="Enter a valid 10-digit mobile number")
+    if payload.otp.strip() != DEMO_OTP:
+        raise HTTPException(status_code=401, detail="Invalid OTP. Use 000000 for demo.")
+
+    user = crud.get_user_by_phone(db, phone)
+    if user:
+        token = create_access_token(user)
+        logger.info("✅ OTP login - %s (%s)", phone, user.role)
+        return TokenResponse(access_token=token, user=user)
+
+    name = (payload.name or "").strip()
+    if len(name) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter your full name to create a new account",
+        )
+    email = phone_email(phone)
+    if crud.get_user_by_email(db, email):
+        raise HTTPException(status_code=400, detail="Unable to create account for this number")
+
+    user = crud.create_user(
+        db,
+        name=name,
+        email=email,
+        password_hash=unusable_password_hash(),
+        role=payload.role,
+        phone=phone,
+    )
+    token = create_access_token(user)
+    logger.info("✅ OTP signup - %s (%s)", phone, user.role)
+    return TokenResponse(access_token=token, user=user)
+
+
 @app.get("/api/auth/me", response_model=UserResponse)
 async def get_me_endpoint(current_user: User = Depends(get_current_user)):
     """Get the currently authenticated user"""
@@ -233,12 +344,12 @@ async def get_landing_config():
             # Default configuration
             default_config = {
                 "title": "Town Exchange",
-                "location": "Chennai",
+                "location": "Your Town",
                 "header": {
                     "logo": {
                         "icon": "Home",
                         "title": "Town Exchange",
-                        "subtitle": "📍 Chennai"
+                        "subtitle": "📍 Your Town"
                     },
                     "postButton": {
                         "text": "Create Post",
@@ -585,14 +696,9 @@ async def create_property_endpoint(
         amenities: str = Form("[]"),
         files: List[UploadFile] = File([]),
         db: Session = Depends(get_db),
-        current_user: Optional[User] = Depends(get_optional_current_user)
+        current_user: User = Depends(require_kyc_verified),
 ):
-    """Create a new property listing with images.
-
-    Auth is optional here (posting must keep working for anonymous users per
-    the existing flow), but when a valid token is supplied the listing is
-    attributed to that account via owner_id.
-    """
+    """Create a new property listing — requires KYC-verified user; enters moderation queue."""
     try:
         logger.info(f"🏠 Creating new property in {city}")
 
@@ -609,7 +715,8 @@ async def create_property_endpoint(
         )
 
         property_data = {
-            "owner_id": current_user.id if current_user else None,
+            "owner_id": current_user.id,
+            "status": "PENDING_REVIEW",
             "property_for": property_for,
             "property_type": property_type,
             "user_type": user_type,
@@ -641,7 +748,18 @@ async def create_property_endpoint(
         new_property = crud.create_property(db, property_data, uploaded_images)
         logger.info(f"✅ Property created successfully - ID: {new_property.id}")
 
-        return new_property
+        if new_property.owner_id:
+            crud.create_notification(
+                db,
+                user_id=new_property.owner_id,
+                type="property_submitted",
+                title="Property submitted for review",
+                body=f"Your listing in {new_property.locality}, {new_property.city} is pending admin approval.",
+                property_id=new_property.id,
+                payload={"path": "/owner/dashboard", "property_id": new_property.id},
+            )
+
+        return serialize_property(db, new_property, current_user.id)
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid amenities JSON format")
@@ -719,16 +837,147 @@ async def get_my_properties_endpoint(
     """Get properties listed by the logged-in user — powers the owner dashboard"""
     properties = crud.get_properties_by_owner(db, current_user.id, skip, limit)
     logger.info(f"🏠 Retrieved {len(properties)} properties for owner {current_user.id}")
-    return properties
+    return [serialize_property(db, prop, current_user.id) for prop in properties]
 
 
 @app.get("/api/properties/{property_id}", response_model=PropertyResponse)
-async def get_property_endpoint(property_id: int, db: Session = Depends(get_db)):
+async def get_property_endpoint(
+        property_id: int,
+        db: Session = Depends(get_db),
+        current_user: Optional[User] = Depends(get_optional_current_user),
+):
     """Get a specific property by ID"""
     property_data = crud.get_property_by_id(db, property_id)
     if not property_data:
         raise HTTPException(status_code=404, detail=f"Property with ID {property_id} not found")
-    return property_data
+    if property_data.status != "PUBLISHED":
+        if not current_user or (
+            current_user.role != "admin" and property_data.owner_id != current_user.id
+        ):
+            raise HTTPException(status_code=404, detail=f"Property with ID {property_id} not found")
+
+    if current_user and current_user.kyc_status == "verified" and property_data.status == "PUBLISHED":
+        from services.activity import record_property_view
+
+        record_property_view(db, current_user, property_data)
+
+    return serialize_property(db, property_data, current_user.id if current_user else None)
+
+
+@app.patch("/api/properties/{property_id}", response_model=PropertyResponse)
+async def update_property_endpoint(
+        property_id: int,
+        property_for: str = Form(..., alias="propertyFor"),
+        property_type: str = Form(..., alias="propertyType"),
+        user_type: str = Form(..., alias="userType"),
+        bhk_type: str = Form(..., alias="bhkType"),
+        apartment_type: str = Form(..., alias="apartmentType"),
+        apartment_name: Optional[str] = Form(None, alias="apartmentName"),
+        locality: str = Form(...),
+        city: str = Form(...),
+        address: str = Form(...),
+        latitude: Optional[float] = Form(None),
+        longitude: Optional[float] = Form(None),
+        built_up_area: Optional[float] = Form(None, alias="builtUpArea"),
+        carpet_area: float = Form(..., alias="carpetArea"),
+        floor: int = Form(...),
+        total_floors: int = Form(..., alias="totalFloors"),
+        property_age: str = Form(..., alias="propertyAge"),
+        furnishing_status: str = Form(..., alias="furnishingStatus"),
+        parking: int = Form(0),
+        bathrooms: int = Form(0),
+        balconies: int = Form(0),
+        expected_price: float = Form(..., alias="expectedPrice"),
+        maintenance_charges: Optional[float] = Form(None, alias="maintenanceCharges"),
+        security_deposit: Optional[float] = Form(None, alias="securityDeposit"),
+        available_from: str = Form(..., alias="availableFrom"),
+        description: Optional[str] = Form(None),
+        amenities: str = Form("[]"),
+        files: List[UploadFile] = File([]),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_kyc_verified),
+):
+    """Owner updates a listing and resubmits for moderation."""
+    prop = crud.get_property_by_id(db, property_id)
+    if not prop or prop.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if prop.status not in ("CHANGES_REQUESTED", "REJECTED"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only listings awaiting changes can be edited (current status: {prop.status})",
+        )
+
+    try:
+        amenities_list = json.loads(amenities)
+        valid_files = [f for f in files if f.filename]
+        uploaded_images = list(prop.images or [])
+
+        if valid_files:
+            new_uploads = await upload_multiple_images(
+                valid_files,
+                folder=settings.CLOUDINARY_FOLDER_PROPERTIES,
+            )
+            uploaded_images = new_uploads
+
+        if len(uploaded_images) < 1:
+            raise HTTPException(status_code=400, detail="At least 1 property image is required")
+
+        update_data = {
+            "property_for": property_for,
+            "property_type": property_type,
+            "user_type": user_type,
+            "bhk_type": bhk_type,
+            "apartment_type": apartment_type,
+            "apartment_name": apartment_name,
+            "locality": locality,
+            "city": city,
+            "address": address,
+            "latitude": latitude,
+            "longitude": longitude,
+            "built_up_area": built_up_area,
+            "carpet_area": carpet_area,
+            "floor": floor,
+            "total_floors": total_floors,
+            "property_age": property_age,
+            "furnishing_status": furnishing_status,
+            "parking": parking,
+            "bathrooms": bathrooms,
+            "balconies": balconies,
+            "expected_price": expected_price,
+            "maintenance_charges": maintenance_charges,
+            "security_deposit": security_deposit,
+            "available_from": available_from,
+            "description": description,
+            "amenities": amenities_list,
+            "images": uploaded_images,
+            "status": "PENDING_REVIEW",
+            "admin_notes": None,
+        }
+
+        updated = crud.update_property(db, property_id, update_data)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        crud.create_notification(
+            db,
+            user_id=current_user.id,
+            type="property_resubmitted",
+            title="Listing resubmitted",
+            body=f"Your updated listing in {updated.locality}, {updated.city} is pending admin review.",
+            property_id=updated.id,
+            payload={"path": "/owner/dashboard", "property_id": updated.id},
+        )
+
+        return serialize_property(db, updated, current_user.id)
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid amenities JSON format")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error updating property: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating property: {str(e)}")
 
 
 @app.delete("/api/properties/{property_id}")
@@ -790,18 +1039,30 @@ async def get_category_stats_endpoint(db: Session = Depends(get_db)):
 # ========================================
 
 @app.post("/api/properties/{property_id}/favourite")
-async def toggle_favourite_endpoint(property_id: int, db: Session = Depends(get_db)):
-    """Toggle favourite status of a property"""
-    property_data = crud.toggle_favourite(db, property_id)
+async def toggle_favourite_endpoint(
+        property_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_kyc_verified),
+):
+    """Toggle favourite for the current user"""
+    is_favourite, property_data = crud.toggle_user_favourite(db, current_user.id, property_id)
     if not property_data:
         raise HTTPException(status_code=404, detail=f"Property with ID {property_id} not found")
 
-    logger.info(f"❤️ Property {property_id} favourite: {property_data.is_favourite}")
+    from services.activity import record_activity
+
+    record_activity(
+        db,
+        current_user,
+        activity_type="FAVOURITE" if is_favourite else "UNFAVOURITE",
+        entity_type="property",
+        entity_id=property_id,
+    )
 
     return {
         "message": "Favourite status updated",
         "property_id": property_id,
-        "is_favourite": property_data.is_favourite
+        "is_favourite": is_favourite,
     }
 
 
@@ -809,18 +1070,22 @@ async def toggle_favourite_endpoint(property_id: int, db: Session = Depends(get_
 async def get_favourites_endpoint(
         skip: int = Query(0, ge=0),
         limit: int = Query(100, ge=1, le=100),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_kyc_verified),
 ):
-    """Get all favourite properties"""
-    favourites = crud.get_favourite_properties(db, skip, limit)
-    logger.info(f"❤️ Retrieved {len(favourites)} favourite properties")
+    """Get favourite properties for the current user"""
+    favourites = crud.get_user_favourite_properties(db, current_user.id, skip, limit)
+    logger.info(f"❤️ Retrieved {len(favourites)} favourite properties for user {current_user.id}")
     return favourites
 
 
 @app.get("/api/favourites/count")
-async def get_favourites_count_endpoint(db: Session = Depends(get_db)):
-    """Get count of favourite properties"""
-    count = crud.get_favourites_count(db)
+async def get_favourites_count_endpoint(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_kyc_verified),
+):
+    """Get count of favourite properties for the current user"""
+    count = crud.get_user_favourites_count(db, current_user.id)
     return {"count": count, "status": "success"}
 
 
