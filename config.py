@@ -1,5 +1,6 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from typing import Set
+from typing import List, Set, Union
 
 
 class Settings(BaseSettings):
@@ -28,13 +29,21 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8024
 
-    # CORS Settings (Town Exchange frontend dev server)
-    CORS_ORIGINS: list = [
+    # CORS — comma-separated in .env / Render, e.g.
+    # CORS_ORIGINS=http://localhost:5188,https://your-app.vercel.app
+    CORS_ORIGINS: List[str] = [
         "http://localhost:5188",
         "http://127.0.0.1:5188",
         "http://localhost:5190",
         "http://127.0.0.1:5190",
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Union[str, List[str]]) -> List[str]:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
     # API Rate Limiting (Optional)
     RATE_LIMIT_ENABLED: bool = False
