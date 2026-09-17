@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, Boolean, Text, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
@@ -81,6 +81,12 @@ class Property(Base):
     bathrooms = Column(Integer, default=0)
     balconies = Column(Integer, default=0)
 
+    # Commercial (additive nullable — full CommercialDetails split later if volume warrants)
+    commercial_subtype = Column(String, nullable=True)  # Shop | Office | Warehouse | Showroom
+    frontage_ft = Column(Float, nullable=True)
+    floor_number = Column(Integer, nullable=True)
+    washroom_count = Column(Integer, nullable=True)
+
     # Pricing
     expected_price = Column(Float, nullable=False, index=True)
     maintenance_charges = Column(Float, nullable=True)
@@ -116,6 +122,50 @@ class Property(Base):
 
     def __repr__(self):
         return f"<Property {self.id}: {self.bhk_type} in {self.city}>"
+
+
+class ProjectDetails(Base):
+    """
+    Optional 1:1 extension for builder / new-project inventory.
+
+    Presence of a row is the canonical "this is a New Project" signal.
+    Resale listings stay on Property alone with no ProjectDetails row.
+    Unit availability updates are self-service and do not re-enter
+    Property.status moderation.
+    """
+    __tablename__ = "project_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(
+        Integer, ForeignKey("properties.id"), unique=True, nullable=False, index=True
+    )
+
+    rera_id = Column(String, nullable=True, index=True)
+    builder_name = Column(String, nullable=True)
+    builder_logo_url = Column(String, nullable=True)
+
+    possession_date = Column(Date, nullable=True)
+    launch_date = Column(Date, nullable=True)
+
+    total_units = Column(Integer, nullable=True)
+    available_units = Column(Integer, nullable=True)
+
+    # Source of truth going forward; property_age remains for legacy filters
+    project_status = Column(String, nullable=True)
+    # "New Launch" | "Under Construction" | "Nearing Possession" | "Ready to Move"
+
+    total_towers = Column(Integer, nullable=True)
+    total_floors = Column(Integer, nullable=True)
+
+    price_starting_from = Column(Float, nullable=True)
+    price_per_sqft_range_min = Column(Float, nullable=True)
+    price_per_sqft_range_max = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ProjectDetails property_id={self.property_id} rera={self.rera_id}>"
 
 
 class Story(Base):
@@ -357,3 +407,24 @@ class AuditLog(Base):
     old_value = Column(JSON, nullable=True)
     new_value = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class NewsItem(Base):
+    """
+    Cached real-estate headlines from a free news API (or curated seed).
+    Served from DB on page load — APScheduler refreshes periodically.
+    """
+    __tablename__ = "news_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String, nullable=True, unique=True, index=True)
+    title = Column(String, nullable=False)
+    summary = Column(Text, nullable=True)
+    source_name = Column(String, nullable=True)
+    url = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)
+    published_at = Column(DateTime, nullable=True, index=True)
+    # Auto-approved if allowlist passes; admins can hide later
+    is_approved = Column(Boolean, default=True, index=True)
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

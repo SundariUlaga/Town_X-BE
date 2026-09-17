@@ -90,3 +90,30 @@ def dispatch_property_created_notifications(db: Session, property_row: Property)
 def dispatch_property_published_notifications(db: Session, property_row: Property) -> int:
     """Notify owner and saved-search subscribers when a listing is published."""
     return dispatch_property_created_notifications(db, property_row)
+
+
+def notify_admins_review_queue(
+    db: Session,
+    *,
+    type: str,
+    title: str,
+    body: str,
+    path: str,
+    property_id: int | None = None,
+) -> int:
+    """Notify every admin when a listing or ad enters the review queue."""
+    created = 0
+    for admin in crud.get_admin_users(db):
+        crud.create_notification(
+            db,
+            user_id=admin.id,
+            type=type,
+            title=title,
+            body=body,
+            property_id=property_id,
+            payload={"path": path, "admin": True},
+        )
+        created += 1
+    if created:
+        logger.info("Notified %s admin(s): %s", created, title)
+    return created

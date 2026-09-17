@@ -27,6 +27,7 @@ from services.ad_lifecycle import (
     notify_ad_rejected,
     notify_ad_submitted,
 )
+from services.notifications import notify_admins_review_queue
 from utils.cloudinary_config import upload_image_to_cloudinary, delete_multiple_images
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,13 @@ async def submit_advertisement(
         },
     )
     notify_ad_submitted(db, ad)
+    notify_admins_review_queue(
+        db,
+        type="admin_review_queue",
+        title="New advertisement to review",
+        body=f"“{ad.title}” is waiting for approval.",
+        path=f"/advertisements/{ad.id}",
+    )
     return _serialize_ad(ad, db)
 
 
@@ -181,6 +189,13 @@ async def update_my_advertisement(
 
     updated = crud.update_advertisement(db, ad, update_data)
     notify_ad_submitted(db, updated)
+    notify_admins_review_queue(
+        db,
+        type="admin_review_queue",
+        title="Advertisement resubmitted",
+        body=f"“{updated.title}” was updated and needs review.",
+        path=f"/advertisements/{updated.id}",
+    )
     return _serialize_ad(updated, db)
 
 
@@ -226,6 +241,12 @@ async def admin_create_advertisement(
 
     parsed_start = datetime.fromisoformat(start_date) if start_date else None
     parsed_end = datetime.fromisoformat(end_date) if end_date else None
+    from services.ad_lifecycle import _to_naive_utc
+
+    if parsed_start:
+        parsed_start = _to_naive_utc(parsed_start)
+    if parsed_end:
+        parsed_end = _to_naive_utc(parsed_end)
     final_status = status
     if status == "PUBLISHED" and parsed_start and parsed_start > datetime.utcnow():
         final_status = "APPROVED"
@@ -273,7 +294,11 @@ async def admin_approve_advertisement(
         raise HTTPException(status_code=404, detail="Advertisement not found")
     if ad.status not in ("PENDING_REVIEW", "CHANGES_REQUESTED", "APPROVED"):
         raise HTTPException(status_code=400, detail=f"Cannot approve ad in status {ad.status}")
-    if payload.end_date < payload.start_date:
+    from services.ad_lifecycle import _to_naive_utc
+
+    start = _to_naive_utc(payload.start_date)
+    end = _to_naive_utc(payload.end_date)
+    if end < start:
         raise HTTPException(status_code=400, detail="End date must be after start date")
 
     updated = approve_and_schedule(
@@ -281,8 +306,8 @@ async def admin_approve_advertisement(
         ad,
         admin,
         display_position=payload.display_position,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
+        start_date=start,
+        end_date=end,
         show_on_homepage=payload.show_on_homepage,
     )
     crud.refresh_advertisement_statuses(db)

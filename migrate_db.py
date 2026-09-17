@@ -26,6 +26,10 @@ PROPERTY_COLUMN_PATCHES: dict[str, str] = {
     "survey_parcel_number": "VARCHAR",
     "encumbrance_certificate_status": "VARCHAR",
     "verification_tier": "VARCHAR DEFAULT 'unverified'",
+    "commercial_subtype": "VARCHAR",
+    "frontage_ft": "REAL",
+    "floor_number": "INTEGER",
+    "washroom_count": "INTEGER",
 }
 
 USER_COLUMN_PATCHES: dict[str, str] = {

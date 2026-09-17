@@ -75,30 +75,67 @@ def get_home_recommendations(db: Session, user: User, *, limit: int = 12) -> dic
     if personalized:
         ranked = sorted(candidates, key=lambda p: _score_property(p, location_scores, viewed_ids), reverse=True)
         top_location = location_scores.most_common(1)[0][0] if location_scores else None
+        # Prefer inventory that isn’t already in the chronological “Recently added” slice
+        recent_ids = {
+            c.id
+            for c in sorted(candidates, key=lambda x: x.created_at or datetime.min, reverse=True)[:limit]
+        }
+        preferred = [p for p in ranked if p.id not in recent_ids]
+        ranked_for_section = preferred if len(preferred) >= 2 else []
     else:
-        ranked = sorted(candidates, key=lambda p: p.created_at, reverse=True)
+        # Price-varied “popular” order so this doesn’t mirror chronological “Recently added”
+        ranked = sorted(
+            candidates,
+            key=lambda p: (float(p.expected_price or 0), p.created_at or datetime.min),
+            reverse=True,
+        )
         top_location = None
+        recent_ids = {
+            c.id
+            for c in sorted(candidates, key=lambda x: x.created_at or datetime.min, reverse=True)[:limit]
+        }
+        ranked_for_section = [p for p in ranked if p.id not in recent_ids]
 
-    items = ranked[:limit]
+    items = ranked_for_section[:limit]
+    used_ids: set[int] = set()
     sections = []
 
-    if items:
+    if items and personalized:
         sections.append(
             {
-                "key": "recommended_for_you" if personalized else "recently_added",
-                "title": "Recommended for you" if personalized else "Recently added",
-                "subtitle": None if personalized else "Popular new listings on Town-X",
+                "key": "recommended_for_you",
+                "title": "Recommended for you",
+                "subtitle": "Based on your recent activity",
                 "properties": items,
             }
         )
+        used_ids.update(p.id for p in items)
+    elif items and not personalized and len(items) >= 3:
+        sections.append(
+            {
+                "key": "popular_picks",
+                "title": "Popular picks",
+                "subtitle": "Higher-ask listings gaining attention",
+                "properties": items,
+            }
+        )
+        used_ids.update(p.id for p in items)
+
+    # Exclude chronological “Recently added” from secondary rails too
+    used_ids.update(recent_ids)
 
     if personalized and top_location:
         location_matches = [
             p
             for p in candidates
-            if top_location in f"{p.locality}, {p.city}".lower() or top_location in p.city.lower()
+            if p.id not in used_ids
+            and (
+                top_location in f"{p.locality}, {p.city}".lower()
+                or top_location in (p.city or "").lower()
+                or top_location in (p.locality or "").lower()
+            )
         ][:8]
-        if location_matches:
+        if location_matches and len(location_matches) >= 2:
             sections.append(
                 {
                     "key": "because_you_searched",
@@ -107,6 +144,7 @@ def get_home_recommendations(db: Session, user: User, *, limit: int = 12) -> dic
                     "properties": location_matches,
                 }
             )
+            used_ids.update(p.id for p in location_matches)
 
     saved = (
         db.query(SavedSearch)
@@ -115,7 +153,11 @@ def get_home_recommendations(db: Session, user: User, *, limit: int = 12) -> dic
         .all()
     )
     for search in saved:
-        matches = [p for p in candidates if crud.property_matches_criteria(p, search.criteria)][:6]
+        matches = [
+            p
+            for p in candidates
+            if p.id not in used_ids and crud.property_matches_criteria(p, search.criteria)
+        ][:6]
         if matches:
             sections.append(
                 {
@@ -125,6 +167,7 @@ def get_home_recommendations(db: Session, user: User, *, limit: int = 12) -> dic
                     "properties": matches,
                 }
             )
+            used_ids.update(p.id for p in matches)
 
     return {
         "personalized": personalized,

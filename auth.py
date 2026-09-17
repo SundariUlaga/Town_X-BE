@@ -1,17 +1,18 @@
 """
-Password hashing + JWT issuance/validation.
+Password hashing + JWT issuance/validation + HttpOnly session cookie.
 
-Scope note: this is a deliberately simple session model (single long-lived
-access token, no refresh rotation, no revocation list) per an explicit
-"prototype the flow first" decision — real, hashed passwords and signed
-tokens, but not yet hardened for production traffic.
+Session model (prototype):
+- Login/OTP issues a JWT and sets HttpOnly cookie ``townx_session``.
+- Clients may also send ``Authorization: Bearer`` (legacy / same-tab cache).
+- Close tab → cookie remains until max-age or logout.
+- No refresh rotation / revocation list yet.
 """
 from datetime import datetime, timedelta
 from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,8 @@ from database import get_db
 from models import User
 
 security = HTTPBearer(auto_error=False)
+
+SESSION_COOKIE_NAME = "townx_session"
 
 
 def hash_password(plain_password: str) -> str:
@@ -50,14 +53,49 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
 
 
+def attach_session_cookie(response: Response, token: str) -> None:
+    """Persist session for later visits (survives tab close)."""
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=bool(settings.SESSION_COOKIE_SECURE),
+        max_age=int(settings.JWT_EXPIRY_HOURS * 3600),
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        samesite="lax",
+        secure=bool(settings.SESSION_COOKIE_SECURE),
+    )
+
+
+def extract_access_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials],
+) -> Optional[str]:
+    """Prefer Bearer header, then HttpOnly session cookie."""
+    if credentials and credentials.credentials:
+        return credentials.credentials
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    return cookie or None
+
+
 def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    if credentials is None:
+    token = extract_access_token(request, credentials)
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     user = db.query(User).filter(User.id == int(payload["sub"])).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -65,16 +103,17 @@ def get_current_user(
 
 
 def get_optional_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> Optional[User]:
     """Like get_current_user, but returns None instead of 401 when no/invalid
-    token is present — used on routes (like posting a listing) that must stay
-    usable without an account, but should attribute ownership when logged in."""
-    if credentials is None:
+    token is present — used on routes that stay usable without an account."""
+    token = extract_access_token(request, credentials)
+    if not token:
         return None
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
     except HTTPException:
         return None
     return db.query(User).filter(User.id == int(payload["sub"])).first()

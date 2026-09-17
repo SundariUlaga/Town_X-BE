@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -12,6 +12,9 @@ from models import Property, Story, User
 from database import get_db
 from schemas import (
     PropertyResponse,
+    FeaturedPropertyResponse,
+    ProjectDetailsResponse,
+    ProjectDetailsUpsert,
     StoryCreate,
     StoryResponse,
     StoryStats,
@@ -34,6 +37,9 @@ from auth import (
     get_current_user,
     get_optional_current_user,
     require_kyc_verified,
+    require_role,
+    attach_session_cookie,
+    clear_session_cookie,
 )
 from app.api.locations import router as locations_router
 from app.api.kyc import router as kyc_router
@@ -43,10 +49,12 @@ from app.api.advertisements import router as advertisements_router
 from app.api.admin import router as admin_router
 from app.api.activity import router as activity_router
 from app.api.recommendations import router as recommendations_router
+from services.notifications import notify_admins_review_queue
 from app.api.enquiries import router as enquiries_router
 from app.api.reports import router as reports_router
+from app.api.news import router as news_router
 from services.phone_otp import DEMO_OTP, default_display_name, normalize_phone, phone_email, unusable_password_hash
-from services.property_serialize import serialize_property
+from services.property_serialize import serialize_property, serialize_properties
 import crud
 
 # Configure logging
@@ -94,6 +102,7 @@ app.include_router(activity_router)
 app.include_router(recommendations_router)
 app.include_router(enquiries_router)
 app.include_router(reports_router)
+app.include_router(news_router)
 
 
 # ========================================
@@ -144,6 +153,20 @@ async def startup_event():
             finally:
                 db.close()
 
+        def refresh_news_job():
+            if not settings.NEWS_FETCH_ENABLED:
+                return
+            db = next(get_db())
+            try:
+                from services.news_fetch import refresh_news_cache
+
+                result = refresh_news_cache(db)
+                logger.info("📰 News cache refresh: %s", result)
+            except Exception as e:
+                logger.error("❌ Error refreshing news cache: %s", e)
+            finally:
+                db.close()
+
         # Start scheduler
         scheduler = BackgroundScheduler()
         scheduler.add_job(
@@ -156,9 +179,35 @@ async def startup_event():
             'interval',
             hours=1,
         )
+        # Daily news pull — serve from DB on pageviews (free-tier safe)
+        scheduler.add_job(
+            refresh_news_job,
+            'cron',
+            hour=settings.NEWS_FETCH_HOUR_UTC,
+            minute=15,
+            id="news_daily_refresh",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
             f"✅ Background scheduler started - cleaning expired stories every {settings.CLEANUP_INTERVAL_HOURS} hour(s)")
+
+        # Seed curated headlines on boot if cache empty (no API burn)
+        try:
+            db = next(get_db())
+            try:
+                from services.news_fetch import seed_curated_if_empty, refresh_news_cache
+
+                seeded = seed_curated_if_empty(db)
+                if seeded:
+                    logger.info("📰 Seeded %s curated news headlines", seeded)
+                elif settings.NEWS_API_KEY:
+                    # One opportunistic refresh at startup when keyed
+                    refresh_news_cache(db)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning("News seed/startup refresh skipped: %s", e)
 
         # Store scheduler in app state for shutdown
         app.state.scheduler = scheduler
@@ -234,8 +283,12 @@ async def health_check(db: Session = Depends(get_db)):
 # ========================================
 
 @app.post("/api/auth/signup", response_model=TokenResponse, status_code=201)
-async def signup_endpoint(payload: UserSignup, db: Session = Depends(get_db)):
-    """Create an account and return a session token"""
+async def signup_endpoint(
+    payload: UserSignup,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Create an account and return a session token (+ HttpOnly cookie)."""
     existing = crud.get_user_by_email(db, payload.email)
     if existing:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -248,18 +301,29 @@ async def signup_endpoint(payload: UserSignup, db: Session = Depends(get_db)):
         role=payload.role,
     )
     token = create_access_token(user)
+    attach_session_cookie(response, token)
     logger.info(f"✅ Signup successful - {user.email} ({user.role})")
     return TokenResponse(access_token=token, user=user)
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
-async def login_endpoint(payload: UserLogin, db: Session = Depends(get_db)):
-    """Authenticate and return a session token"""
+async def login_endpoint(
+    payload: UserLogin,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Authenticate and return a session token (+ HttpOnly cookie)."""
     user = crud.get_user_by_email(db, payload.email)
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
+    if user.role == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrators sign in at the Admin Console, not Town-X.",
+        )
 
     token = create_access_token(user)
+    attach_session_cookie(response, token)
     logger.info(f"✅ Login successful - {user.email} ({user.role})")
     return TokenResponse(access_token=token, user=user)
 
@@ -281,7 +345,11 @@ async def send_otp_endpoint(payload: SendOtpRequest, db: Session = Depends(get_d
 
 
 @app.post("/api/auth/verify-otp", response_model=TokenResponse)
-async def verify_otp_endpoint(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
+async def verify_otp_endpoint(
+    payload: VerifyOtpRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     """Verify OTP and sign in — creates account automatically if phone is new."""
     phone = normalize_phone(payload.phone)
     if len(phone) != 10:
@@ -291,7 +359,13 @@ async def verify_otp_endpoint(payload: VerifyOtpRequest, db: Session = Depends(g
 
     user = crud.get_user_by_phone(db, phone)
     if user:
+        if user.role == "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Administrators sign in at the Admin Console, not Town-X.",
+            )
         token = create_access_token(user)
+        attach_session_cookie(response, token)
         logger.info("✅ OTP login - %s (%s)", phone, user.role)
         return TokenResponse(access_token=token, user=user)
 
@@ -301,6 +375,7 @@ async def verify_otp_endpoint(payload: VerifyOtpRequest, db: Session = Depends(g
             status_code=400,
             detail="Enter your full name to create a new account",
         )
+    role = payload.role if payload.role in ("buyer", "owner") else "buyer"
     email = phone_email(phone)
     if crud.get_user_by_email(db, email):
         raise HTTPException(status_code=400, detail="Unable to create account for this number")
@@ -310,18 +385,26 @@ async def verify_otp_endpoint(payload: VerifyOtpRequest, db: Session = Depends(g
         name=name,
         email=email,
         password_hash=unusable_password_hash(),
-        role=payload.role,
+        role=role,
         phone=phone,
     )
     token = create_access_token(user)
+    attach_session_cookie(response, token)
     logger.info("✅ OTP signup - %s (%s)", phone, user.role)
     return TokenResponse(access_token=token, user=user)
 
 
 @app.get("/api/auth/me", response_model=UserResponse)
 async def get_me_endpoint(current_user: User = Depends(get_current_user)):
-    """Get the currently authenticated user"""
+    """Validate session cookie / Bearer and return the current user."""
     return current_user
+
+
+@app.post("/api/auth/logout", response_model=MessageResponse)
+async def logout_endpoint(response: Response):
+    """Clear the HttpOnly session cookie. Client should also clear local cache."""
+    clear_session_cookie(response)
+    return MessageResponse(message="Logged out")
 
 
 # ========================================
@@ -418,8 +501,11 @@ async def get_landing_config():
 
 
 @app.put("/api/landing-config")
-async def update_landing_config(config: dict):
-    """Update landing page configuration (admin endpoint)"""
+async def update_landing_config(
+    config: dict,
+    _admin: User = Depends(require_role("admin")),
+):
+    """Update landing page configuration (admin only)"""
     try:
         config_path = os.path.join(os.path.dirname(__file__), 'config', 'landingPageConfig.json')
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
@@ -522,7 +608,7 @@ async def create_story_endpoint(
         new_story = crud.create_story(db, story_data, media_info)
         logger.info(f"✅ Story created successfully - ID: {new_story.id}")
 
-        return new_story
+        return crud.serialize_stories(db, [new_story])[0]
 
     except HTTPException:
         raise
@@ -561,7 +647,7 @@ async def get_stories_endpoint(
         stories = crud.get_active_stories(db, limit)
         logger.info(f"📖 Retrieved {len(stories)} active stories")
 
-    return stories
+    return crud.serialize_stories(db, stories)
 
 
 @app.get("/api/stories/trending", response_model=List[StoryResponse])
@@ -572,7 +658,7 @@ async def get_trending_stories_endpoint(
     """Get trending stories (most viewed)"""
     trending = crud.get_trending_stories(db, limit)
     logger.info(f"🔥 Retrieved {len(trending)} trending stories")
-    return trending
+    return crud.serialize_stories(db, trending)
 
 
 @app.get("/api/stories/stats", response_model=StoryStats)
@@ -612,19 +698,24 @@ async def get_story_endpoint(
 
     logger.info(f"👁️ Story {story_id} viewed - Total views: {story.views_count}")
 
-    return story
+    return crud.serialize_stories(db, [story])[0]
 
 
 @app.delete("/api/stories/{story_id}")
 async def delete_story_endpoint(
         story_id: int,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
 ):
-    """Delete a story (soft delete)"""
+    """Delete a story (soft delete) — owner of story or admin"""
     story = crud.get_story_by_id(db, story_id)
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
+
+    story_owner = str(story.user_id) if story.user_id is not None else None
+    if current_user.role != "admin" and story_owner not in {str(current_user.id), current_user.phone, current_user.email}:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this story")
 
     # Delete from Cloudinary
     if story.public_id:
@@ -646,9 +737,12 @@ async def delete_story_endpoint(
 
 
 @app.post("/api/stories/cleanup")
-async def cleanup_expired_stories_endpoint(db: Session = Depends(get_db)):
+async def cleanup_expired_stories_endpoint(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("admin")),
+):
     """
-    Manually trigger cleanup of expired stories
+    Manually trigger cleanup of expired stories (admin only).
     (Usually runs automatically via background job)
     """
     logger.info("🧹 Manual cleanup triggered")
@@ -671,8 +765,8 @@ async def create_property_endpoint(
         property_for: str = Form(..., alias="propertyFor"),
         property_type: str = Form(..., alias="propertyType"),
         user_type: str = Form(..., alias="userType"),
-        bhk_type: str = Form(..., alias="bhkType"),
-        apartment_type: str = Form(..., alias="apartmentType"),
+        bhk_type: Optional[str] = Form(None, alias="bhkType"),
+        apartment_type: Optional[str] = Form(None, alias="apartmentType"),
         apartment_name: Optional[str] = Form(None, alias="apartmentName"),
         locality: str = Form(...),
         city: str = Form(...),
@@ -681,13 +775,17 @@ async def create_property_endpoint(
         longitude: Optional[float] = Form(None),
         built_up_area: Optional[float] = Form(None, alias="builtUpArea"),
         carpet_area: float = Form(..., alias="carpetArea"),
-        floor: int = Form(...),
-        total_floors: int = Form(..., alias="totalFloors"),
-        property_age: str = Form(..., alias="propertyAge"),
-        furnishing_status: str = Form(..., alias="furnishingStatus"),
+        floor: Optional[int] = Form(None),
+        total_floors: Optional[int] = Form(None, alias="totalFloors"),
+        property_age: Optional[str] = Form(None, alias="propertyAge"),
+        furnishing_status: Optional[str] = Form(None, alias="furnishingStatus"),
         parking: int = Form(0),
         bathrooms: int = Form(0),
         balconies: int = Form(0),
+        commercial_subtype: Optional[str] = Form(None, alias="commercialSubtype"),
+        frontage_ft: Optional[float] = Form(None, alias="frontageFt"),
+        floor_number: Optional[int] = Form(None, alias="floorNumber"),
+        washroom_count: Optional[int] = Form(None, alias="washroomCount"),
         expected_price: float = Form(..., alias="expectedPrice"),
         maintenance_charges: Optional[float] = Form(None, alias="maintenanceCharges"),
         security_deposit: Optional[float] = Form(None, alias="securityDeposit"),
@@ -704,6 +802,29 @@ async def create_property_endpoint(
 
         amenities_list = json.loads(amenities)
 
+        if user_type not in ("Owner", "Builder"):
+            raise HTTPException(
+                status_code=400,
+                detail="Only property owners or builders can post listings",
+            )
+
+        is_commercial = property_type.strip() == "Commercial"
+        if is_commercial and not (commercial_subtype or "").strip():
+            raise HTTPException(status_code=400, detail="Select a commercial subtype (Shop, Office, etc.)")
+        if not is_commercial:
+            if not bhk_type:
+                raise HTTPException(status_code=400, detail="BHK type is required")
+            if not apartment_type:
+                raise HTTPException(status_code=400, detail="Apartment type is required")
+            if floor is None:
+                raise HTTPException(status_code=400, detail="Floor is required")
+            if total_floors is None:
+                raise HTTPException(status_code=400, detail="Total floors is required")
+            if not property_age:
+                raise HTTPException(status_code=400, detail="Property age is required")
+            if not furnishing_status:
+                raise HTTPException(status_code=400, detail="Furnishing status is required")
+
         valid_files = [f for f in files if f.filename]
         if len(valid_files) < 1:
             raise HTTPException(status_code=400, detail="At least 1 property image is required")
@@ -714,7 +835,7 @@ async def create_property_endpoint(
             folder=settings.CLOUDINARY_FOLDER_PROPERTIES
         )
 
-        property_data = {
+        property_data = crud.normalize_commercial_listing_fields({
             "owner_id": current_user.id,
             "status": "PENDING_REVIEW",
             "property_for": property_for,
@@ -730,22 +851,29 @@ async def create_property_endpoint(
             "longitude": longitude,
             "built_up_area": built_up_area,
             "carpet_area": carpet_area,
-            "floor": floor,
-            "total_floors": total_floors,
-            "property_age": property_age,
-            "furnishing_status": furnishing_status,
+            "floor": floor if floor is not None else 0,
+            "total_floors": total_floors if total_floors is not None else 1,
+            "property_age": property_age or "1-5 Years",
+            "furnishing_status": furnishing_status or "Not Applicable",
             "parking": parking,
             "bathrooms": bathrooms,
             "balconies": balconies,
+            "commercial_subtype": commercial_subtype,
+            "frontage_ft": frontage_ft,
+            "floor_number": floor_number,
+            "washroom_count": washroom_count,
             "expected_price": expected_price,
             "maintenance_charges": maintenance_charges,
             "security_deposit": security_deposit,
             "available_from": available_from,
             "description": description,
             "amenities": amenities_list,
-        }
+        })
 
         new_property = crud.create_property(db, property_data, uploaded_images)
+        if crud.should_auto_create_project_details(new_property):
+            crud.create_project_details_stub(db, new_property, commit=True)
+            logger.info(f"🏗️ ProjectDetails stub created for property {new_property.id}")
         logger.info(f"✅ Property created successfully - ID: {new_property.id}")
 
         if new_property.owner_id:
@@ -758,6 +886,14 @@ async def create_property_endpoint(
                 property_id=new_property.id,
                 payload={"path": "/owner/dashboard", "property_id": new_property.id},
             )
+        notify_admins_review_queue(
+            db,
+            type="admin_review_queue",
+            title="New listing to review",
+            body=f"{new_property.bhk_type} in {new_property.locality}, {new_property.city} is waiting for approval.",
+            path=f"/properties/{new_property.id}",
+            property_id=new_property.id,
+        )
 
         return serialize_property(db, new_property, current_user.id)
 
@@ -776,7 +912,8 @@ async def create_property_endpoint(
 async def get_properties_endpoint(
         skip: int = Query(0, ge=0, description="Number of records to skip"),
         limit: int = Query(20, ge=1, le=100, description="Maximum records to return"),
-        city: Optional[str] = Query(None, description="Filter by city"),
+        city: Optional[str] = Query(None, description="Filter by city / district"),
+        locality: Optional[str] = Query(None, description="Filter by locality / taluk / zone"),
         property_for: Optional[str] = Query(None, description="Filter by purpose (Rent/Sell/PG)"),
         property_type: Optional[str] = Query(None, description="Filter by type (Residential/Commercial)"),
         bhk_type: Optional[str] = Query(None, description="Filter by BHK type"),
@@ -788,13 +925,14 @@ async def get_properties_endpoint(
 ):
     """Get all property listings with optional filters"""
     properties = crud.get_properties(
-        db=db, skip=skip, limit=limit, city=city, property_for=property_for,
+        db=db, skip=skip, limit=limit, city=city, locality=locality,
+        property_for=property_for,
         property_type=property_type,
         bhk_type=bhk_type, min_price=min_price, max_price=max_price,
         category=category, furnishing_status=furnishing_status
     )
     logger.info(f"📋 Retrieved {len(properties)} properties")
-    return properties
+    return serialize_properties(db, properties)
 
 
 @app.get("/api/properties/search", response_model=List[PropertyResponse])
@@ -806,7 +944,7 @@ async def search_properties_endpoint(
     """Search properties by city, locality, or apartment name"""
     results = crud.search_properties(db, q, limit)
     logger.info(f"🔍 Search '{q}' returned {len(results)} results")
-    return results
+    return serialize_properties(db, results)
 
 
 @app.get("/api/properties/nearby", response_model=List[PropertyResponse])
@@ -824,7 +962,29 @@ async def get_nearby_properties_endpoint(
         radius_km=radius, skip=skip, limit=limit
     )
     logger.info(f"📍 Found {len(properties)} properties within {radius}km")
-    return properties
+    return serialize_properties(db, properties)
+
+
+@app.get("/api/properties/featured", response_model=List[FeaturedPropertyResponse])
+async def get_featured_properties_endpoint(
+    city: Optional[str] = Query(None),
+    limit: int = Query(12, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+):
+    """Premium showcase listings — ad-linked first, then recent published from DB."""
+    pairs = crud.get_featured_properties(db, limit=limit, city=city)
+    user_id = current_user.id if current_user else None
+    out: list[FeaturedPropertyResponse] = []
+    for prop, reason in pairs:
+        base = serialize_property(db, prop, user_id)
+        out.append(
+            FeaturedPropertyResponse(
+                **base.model_dump(),
+                feature_reason=reason,
+            )
+        )
+    return out
 
 
 @app.get("/api/properties/mine", response_model=List[PropertyResponse])
@@ -870,8 +1030,8 @@ async def update_property_endpoint(
         property_for: str = Form(..., alias="propertyFor"),
         property_type: str = Form(..., alias="propertyType"),
         user_type: str = Form(..., alias="userType"),
-        bhk_type: str = Form(..., alias="bhkType"),
-        apartment_type: str = Form(..., alias="apartmentType"),
+        bhk_type: Optional[str] = Form(None, alias="bhkType"),
+        apartment_type: Optional[str] = Form(None, alias="apartmentType"),
         apartment_name: Optional[str] = Form(None, alias="apartmentName"),
         locality: str = Form(...),
         city: str = Form(...),
@@ -880,13 +1040,17 @@ async def update_property_endpoint(
         longitude: Optional[float] = Form(None),
         built_up_area: Optional[float] = Form(None, alias="builtUpArea"),
         carpet_area: float = Form(..., alias="carpetArea"),
-        floor: int = Form(...),
-        total_floors: int = Form(..., alias="totalFloors"),
-        property_age: str = Form(..., alias="propertyAge"),
-        furnishing_status: str = Form(..., alias="furnishingStatus"),
+        floor: Optional[int] = Form(None),
+        total_floors: Optional[int] = Form(None, alias="totalFloors"),
+        property_age: Optional[str] = Form(None, alias="propertyAge"),
+        furnishing_status: Optional[str] = Form(None, alias="furnishingStatus"),
         parking: int = Form(0),
         bathrooms: int = Form(0),
         balconies: int = Form(0),
+        commercial_subtype: Optional[str] = Form(None, alias="commercialSubtype"),
+        frontage_ft: Optional[float] = Form(None, alias="frontageFt"),
+        floor_number: Optional[int] = Form(None, alias="floorNumber"),
+        washroom_count: Optional[int] = Form(None, alias="washroomCount"),
         expected_price: float = Form(..., alias="expectedPrice"),
         maintenance_charges: Optional[float] = Form(None, alias="maintenanceCharges"),
         security_deposit: Optional[float] = Form(None, alias="securityDeposit"),
@@ -909,6 +1073,18 @@ async def update_property_endpoint(
 
     try:
         amenities_list = json.loads(amenities)
+        if user_type != "Owner":
+            raise HTTPException(status_code=400, detail="Only property owners can post listings")
+
+        is_commercial = property_type.strip() == "Commercial"
+        if is_commercial and not (commercial_subtype or "").strip():
+            raise HTTPException(status_code=400, detail="Select a commercial subtype (Shop, Office, etc.)")
+        if not is_commercial:
+            if not bhk_type or not apartment_type:
+                raise HTTPException(status_code=400, detail="BHK and apartment type are required")
+            if floor is None or total_floors is None or not property_age or not furnishing_status:
+                raise HTTPException(status_code=400, detail="Floor, age, and furnishing are required")
+
         valid_files = [f for f in files if f.filename]
         uploaded_images = list(prop.images or [])
 
@@ -922,10 +1098,10 @@ async def update_property_endpoint(
         if len(uploaded_images) < 1:
             raise HTTPException(status_code=400, detail="At least 1 property image is required")
 
-        update_data = {
+        update_data = crud.normalize_commercial_listing_fields({
             "property_for": property_for,
             "property_type": property_type,
-            "user_type": user_type,
+            "user_type": "Owner",
             "bhk_type": bhk_type,
             "apartment_type": apartment_type,
             "apartment_name": apartment_name,
@@ -936,13 +1112,17 @@ async def update_property_endpoint(
             "longitude": longitude,
             "built_up_area": built_up_area,
             "carpet_area": carpet_area,
-            "floor": floor,
-            "total_floors": total_floors,
-            "property_age": property_age,
-            "furnishing_status": furnishing_status,
+            "floor": floor if floor is not None else 0,
+            "total_floors": total_floors if total_floors is not None else 1,
+            "property_age": property_age or "1-5 Years",
+            "furnishing_status": furnishing_status or "Not Applicable",
             "parking": parking,
             "bathrooms": bathrooms,
             "balconies": balconies,
+            "commercial_subtype": commercial_subtype,
+            "frontage_ft": frontage_ft,
+            "floor_number": floor_number,
+            "washroom_count": washroom_count,
             "expected_price": expected_price,
             "maintenance_charges": maintenance_charges,
             "security_deposit": security_deposit,
@@ -952,7 +1132,7 @@ async def update_property_endpoint(
             "images": uploaded_images,
             "status": "PENDING_REVIEW",
             "admin_notes": None,
-        }
+        })
 
         updated = crud.update_property(db, property_id, update_data)
         if not updated:
@@ -966,6 +1146,14 @@ async def update_property_endpoint(
             body=f"Your updated listing in {updated.locality}, {updated.city} is pending admin review.",
             property_id=updated.id,
             payload={"path": "/owner/dashboard", "property_id": updated.id},
+        )
+        notify_admins_review_queue(
+            db,
+            type="admin_review_queue",
+            title="Listing resubmitted",
+            body=f"{updated.bhk_type} in {updated.locality}, {updated.city} was updated and needs review.",
+            path=f"/properties/{updated.id}",
+            property_id=updated.id,
         )
 
         return serialize_property(db, updated, current_user.id)
@@ -981,11 +1169,18 @@ async def update_property_endpoint(
 
 
 @app.delete("/api/properties/{property_id}")
-async def delete_property_endpoint(property_id: int, db: Session = Depends(get_db)):
-    """Delete a property and its images from Cloudinary"""
+async def delete_property_endpoint(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a property and its images from Cloudinary (owner or admin)"""
     property_data = crud.get_property_by_id(db, property_id)
     if not property_data:
         raise HTTPException(status_code=404, detail=f"Property with ID {property_id} not found")
+
+    if current_user.role != "admin" and property_data.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this property")
 
     if property_data.images:
         public_ids = [img["public_id"] for img in property_data.images]
@@ -1027,16 +1222,64 @@ async def get_category_stats_endpoint(db: Session = Depends(get_db)):
             "Rent/Lease": counts["rent_lease"],
             "Buy Land/Homes": counts["buy"],
             "New Project": counts["new_projects"],
-            "Ready To Move/Resale": counts["ready_to_move"]
+            "Ready To Move/Resale": counts["ready_to_move"],
+            "Commercial": counts["commercial"],
         },
         "total": sum(counts.values()),
         "status": "success"
     }
 
 
+@app.get("/api/market/insights")
+async def get_market_insights_endpoint(
+    city: Optional[str] = Query(None, description="Optional city filter"),
+    limit: int = Query(8, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    """Top localities and price aggregates from published properties in the DB."""
+    return crud.get_market_insights(db, city=city, limit=limit)
+
+
 # ========================================
 # FAVOURITE ENDPOINTS
 # ========================================
+
+@app.post(
+    "/api/properties/{property_id}/project-details",
+    response_model=ProjectDetailsResponse,
+)
+async def upsert_project_details_endpoint(
+    property_id: int,
+    body: ProjectDetailsUpsert,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_kyc_verified),
+):
+    """
+    Attach or update New Project inventory for a listing.
+
+    Self-service for the listing owner — does NOT re-enter PENDING_REVIEW.
+    Allowed when the listing is Builder-posted, already has ProjectDetails,
+    or matches the legacy new-project age proxy (transition).
+    """
+    prop = crud.get_property_by_id(db, property_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if prop.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not allowed to update this project")
+
+    existing = crud.get_project_details_by_property_id(db, property_id)
+    is_builder = (prop.user_type or "").lower() == "builder"
+    is_legacy_project = (prop.property_age or "") in crud.LEGACY_NEW_PROJECT_AGES
+    if not existing and not is_builder and not is_legacy_project and current_user.role != "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Project details only apply to builder / new-project listings",
+        )
+
+    payload = body.model_dump(exclude_unset=True)
+    details = crud.upsert_project_details(db, property_id, payload)
+    return ProjectDetailsResponse.model_validate(details)
+
 
 @app.post("/api/properties/{property_id}/favourite")
 async def toggle_favourite_endpoint(
@@ -1076,7 +1319,7 @@ async def get_favourites_endpoint(
     """Get favourite properties for the current user"""
     favourites = crud.get_user_favourite_properties(db, current_user.id, skip, limit)
     logger.info(f"❤️ Retrieved {len(favourites)} favourite properties for user {current_user.id}")
-    return favourites
+    return serialize_properties(db, favourites, current_user.id)
 
 
 @app.get("/api/favourites/count")

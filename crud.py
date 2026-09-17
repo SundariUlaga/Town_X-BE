@@ -3,11 +3,23 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import Property, Story, StoryView, SupportQuestion, User, SavedSearch, Notification, Advertisement, UserFavourite, UserActivity, PropertyEnquiry, PropertyReport, AuditLog, PropertyReviewNote
-from typing import List, Optional
+from models import Property, Story, StoryView, SupportQuestion, User, SavedSearch, Notification, Advertisement, UserFavourite, UserActivity, PropertyEnquiry, PropertyReport, AuditLog, PropertyReviewNote, ProjectDetails
+from typing import List, Optional, Dict
+from datetime import date
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+LEGACY_NEW_PROJECT_AGES = ("Under Construction", "0-1 Years", "0-1 Year", "New Launch")
+
+
+def _new_project_match_clause():
+    """EXISTS(project_details) OR legacy property_age proxy — transition-safe."""
+    from sqlalchemy import or_, exists
+
+    has_details = exists().where(ProjectDetails.property_id == Property.id)
+    legacy = Property.property_age.in_(LEGACY_NEW_PROJECT_AGES)
+    return or_(has_details, legacy)
 
 
 # ========================================
@@ -47,6 +59,10 @@ def get_user_by_phone(db: Session, phone: str) -> Optional[User]:
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     return db.query(User).filter(User.id == user_id).first()
+
+
+def get_admin_users(db: Session) -> List[User]:
+    return db.query(User).filter(User.role == "admin").all()
 
 
 def update_user_kyc(
@@ -120,11 +136,140 @@ def create_property(db: Session, property_data: dict, images: List[dict]) -> Pro
     return db_property
 
 
+def normalize_commercial_listing_fields(property_data: dict) -> dict:
+    """
+    When property_type is Commercial, fill residential-required columns with
+    sensible placeholders and keep commercial_* fields as source of truth.
+    """
+    if (property_data.get("property_type") or "").strip() != "Commercial":
+        return property_data
+
+    subtype = (property_data.get("commercial_subtype") or "").strip() or "Commercial"
+    property_data["commercial_subtype"] = subtype
+    property_data["bhk_type"] = property_data.get("bhk_type") or subtype
+    property_data["apartment_type"] = property_data.get("apartment_type") or subtype
+    property_data["furnishing_status"] = property_data.get("furnishing_status") or "Not Applicable"
+
+    floor_number = property_data.get("floor_number")
+    if floor_number is None and property_data.get("floor") is not None:
+        floor_number = property_data["floor"]
+    if floor_number is not None:
+        property_data["floor_number"] = int(floor_number)
+        property_data["floor"] = int(floor_number)
+    else:
+        property_data["floor"] = property_data.get("floor") if property_data.get("floor") is not None else 0
+        property_data["floor_number"] = property_data["floor"]
+
+    washrooms = property_data.get("washroom_count")
+    if washrooms is not None:
+        property_data["washroom_count"] = int(washrooms)
+        property_data["bathrooms"] = int(washrooms)
+
+    if not property_data.get("total_floors"):
+        property_data["total_floors"] = max(int(property_data.get("floor") or 0), 1)
+
+    if not property_data.get("property_age"):
+        property_data["property_age"] = "1-5 Years"
+
+    property_data["balconies"] = property_data.get("balconies") or 0
+    return property_data
+
+
+def parse_flexible_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(raw[:10], fmt).date()
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "")).date()
+    except ValueError:
+        return None
+
+
+def get_project_details_by_property_id(db: Session, property_id: int) -> Optional[ProjectDetails]:
+    return db.query(ProjectDetails).filter(ProjectDetails.property_id == property_id).first()
+
+
+def get_project_details_map(db: Session, property_ids: List[int]) -> Dict[int, ProjectDetails]:
+    if not property_ids:
+        return {}
+    rows = (
+        db.query(ProjectDetails)
+        .filter(ProjectDetails.property_id.in_(property_ids))
+        .all()
+    )
+    return {row.property_id: row for row in rows}
+
+
+def should_auto_create_project_details(prop: Property) -> bool:
+    if (prop.user_type or "").lower() == "builder":
+        return True
+    return (prop.property_age or "") in LEGACY_NEW_PROJECT_AGES
+
+
+def create_project_details_stub(db: Session, prop: Property, *, commit: bool = True) -> ProjectDetails:
+    """Minimal ProjectDetails row — presence marks listing as a New Project."""
+    existing = get_project_details_by_property_id(db, prop.id)
+    if existing:
+        return existing
+
+    status = None
+    age = prop.property_age or ""
+    if age in ("New Launch",):
+        status = "New Launch"
+    elif age in ("Under Construction",):
+        status = "Under Construction"
+    elif age in ("0-1 Years", "0-1 Year"):
+        status = "Nearing Possession"
+
+    details = ProjectDetails(
+        property_id=prop.id,
+        builder_name=prop.apartment_name if (prop.user_type or "").lower() == "builder" else prop.apartment_name,
+        possession_date=parse_flexible_date(prop.available_from),
+        project_status=status,
+        price_starting_from=prop.expected_price,
+        total_floors=prop.total_floors if prop.total_floors else None,
+    )
+    db.add(details)
+    if commit:
+        db.commit()
+        db.refresh(details)
+    else:
+        db.flush()
+    return details
+
+
+def upsert_project_details(
+    db: Session,
+    property_id: int,
+    payload: dict,
+) -> ProjectDetails:
+    details = get_project_details_by_property_id(db, property_id)
+    if details is None:
+        details = ProjectDetails(property_id=property_id)
+        db.add(details)
+
+    for key, value in payload.items():
+        if value is not None or key in payload:
+            # Allow explicit null clears only for keys present; Upsert sends partial
+            setattr(details, key, value)
+
+    details.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(details)
+    return details
+
+
 def get_properties(
         db: Session,
         skip: int = 0,
         limit: int = 20,
         city: Optional[str] = None,
+        locality: Optional[str] = None,
         property_for: Optional[str] = None,
         property_type: Optional[str] = None,
         bhk_type: Optional[str] = None,
@@ -155,7 +300,7 @@ def get_properties(
         elif category == "Buy Land/Homes":
             query = query.filter(Property.property_for == "Sell")
         elif category == "New Project":
-            query = query.filter(Property.property_age.in_(["Under Construction", "0-1 Years"]))
+            query = query.filter(_new_project_match_clause())
         elif category == "Ready To Move/Resale":
             query = query.filter(
                 Property.property_for == "Sell",
@@ -165,6 +310,11 @@ def get_properties(
     # Apply other filters
     if city:
         query = query.filter(Property.city.ilike(f"%{city}%"))
+    if locality:
+        query = query.filter(
+            (Property.locality.ilike(f"%{locality}%"))
+            | (Property.address.ilike(f"%{locality}%"))
+        )
     if property_for:
         query = query.filter(Property.property_for == property_for)
     if property_type:
@@ -252,18 +402,121 @@ def search_properties(db: Session, search_term: str, limit: int = 20) -> List[Pr
     return results
 
 
+def get_featured_properties(
+    db: Session,
+    *,
+    limit: int = 12,
+    city: Optional[str] = None,
+) -> list[tuple[Property, str]]:
+    """
+    Premium showcase listings from the DB.
+    Prefer properties linked to live homepage ads; fill with recent published listings.
+    Returns (property, feature_reason) pairs.
+    """
+    results: list[tuple[Property, str]] = []
+    seen: set[int] = set()
+
+    ads = get_homepage_slider_ads(db)
+    for ad in ads:
+        if not ad.property_id or ad.property_id in seen:
+            continue
+        prop = get_property_by_id(db, ad.property_id)
+        if not prop or prop.status != "PUBLISHED":
+            continue
+        if city and city.lower() not in (prop.city or "").lower():
+            continue
+        reason = (ad.selling_point or ad.badge_text or "Featured on homepage").strip()
+        results.append((prop, reason))
+        seen.add(prop.id)
+        if len(results) >= limit:
+            return results
+
+    query = (
+        db.query(Property)
+        .filter(Property.status == "PUBLISHED")
+        .order_by(Property.created_at.desc())
+    )
+    if city:
+        query = query.filter(Property.city.ilike(f"%{city}%"))
+
+    for prop in query.limit(limit * 2).all():
+        if prop.id in seen:
+            continue
+        if prop.user_type == "Owner":
+            reason = "Direct owner"
+        elif prop.verification_tier == "verified":
+            reason = "Verified listing"
+        elif prop.locality:
+            reason = f"In {prop.locality}"
+        else:
+            reason = "Fresh on Town-X"
+        results.append((prop, reason))
+        seen.add(prop.id)
+        if len(results) >= limit:
+            break
+
+    return results
+
+
 def get_category_counts(db: Session) -> dict:
     """Get count of properties in each category"""
     return {
         "rent_lease": db.query(Property).filter(Property.property_for == "Rent/Lease").count(),
         "buy": db.query(Property).filter(Property.property_for == "Sell").count(),
-        "new_projects": db.query(Property).filter(
-            Property.property_age.in_(["Under Construction", "0-1 Years"])
-        ).count(),
+        "new_projects": db.query(Property).filter(_new_project_match_clause()).count(),
         "ready_to_move": db.query(Property).filter(
             Property.property_for == "Sell",
             ~Property.property_age.in_(["Under Construction"])
-        ).count()
+        ).count(),
+        "commercial": db.query(Property).filter(Property.property_type == "Commercial").count(),
+    }
+
+
+def get_market_insights(db: Session, *, city: Optional[str] = None, limit: int = 8) -> dict:
+    """Aggregate top localities and avg asking prices from published listings."""
+    from sqlalchemy import func
+
+    filters = [Property.status == "PUBLISHED", Property.locality.isnot(None), Property.locality != ""]
+    if city:
+        filters.append(Property.city.ilike(f"%{city}%"))
+
+    total_q = db.query(func.count(Property.id)).filter(Property.status == "PUBLISHED")
+    if city:
+        total_q = total_q.filter(Property.city.ilike(f"%{city}%"))
+    total_published = total_q.scalar() or 0
+
+    rows = (
+        db.query(
+            Property.locality,
+            Property.city,
+            func.count(Property.id).label("listing_count"),
+            func.avg(Property.expected_price).label("avg_price"),
+            func.min(Property.expected_price).label("min_price"),
+            func.max(Property.expected_price).label("max_price"),
+        )
+        .filter(*filters)
+        .group_by(Property.locality, Property.city)
+        .order_by(func.count(Property.id).desc())
+        .limit(limit)
+        .all()
+    )
+
+    localities = []
+    for row in rows:
+        localities.append(
+            {
+                "locality": row.locality,
+                "city": row.city,
+                "listing_count": int(row.listing_count or 0),
+                "avg_price": float(row.avg_price) if row.avg_price is not None else None,
+                "min_price": float(row.min_price) if row.min_price is not None else None,
+                "max_price": float(row.max_price) if row.max_price is not None else None,
+            }
+        )
+
+    return {
+        "total_published": int(total_published),
+        "localities": localities,
     }
 
 
@@ -481,6 +734,77 @@ def get_properties_by_location(
 # ========================================
 # STORY CRUD OPERATIONS
 # ========================================
+
+def serialize_stories(db: Session, stories: List[Story]) -> list[dict]:
+    """Attach author names + linked property fields for the FB-style story tray."""
+    ids: set[int] = set()
+    prop_ids: set[int] = set()
+    for story in stories:
+        if story.user_id:
+            try:
+                ids.add(int(str(story.user_id).strip()))
+            except (TypeError, ValueError):
+                pass
+        if story.property_id:
+            prop_ids.add(story.property_id)
+
+    names: dict[str, str] = {}
+    if ids:
+        for user in db.query(User).filter(User.id.in_(ids)).all():
+            names[str(user.id)] = user.name
+
+    props: dict[int, Property] = {}
+    if prop_ids:
+        for prop in db.query(Property).filter(Property.id.in_(prop_ids)).all():
+            props[prop.id] = prop
+
+    max_views = max((s.views_count or 0) for s in stories) if stories else 0
+
+    payload = []
+    for story in stories:
+        prop = props.get(story.property_id) if story.property_id else None
+        cover_url = None
+        property_price = None
+        property_locality = None
+        property_city = None
+        if prop:
+            property_price = float(prop.expected_price) if prop.expected_price is not None else None
+            property_locality = prop.locality
+            property_city = prop.city
+            images = prop.images if isinstance(prop.images, list) else []
+            if images and isinstance(images[0], dict) and images[0].get("url"):
+                cover_url = images[0]["url"]
+
+        views = story.views_count or 0
+        is_hot = views >= 5 and (max_views == 0 or views >= max(5, int(max_views * 0.6)))
+
+        data = {
+            "id": story.id,
+            "user_id": story.user_id,
+            "user_name": names.get(str(story.user_id).strip()) if story.user_id else None,
+            "property_id": story.property_id,
+            "media_url": story.media_url,
+            "media_type": story.media_type,
+            "public_id": story.public_id,
+            "thumbnail_url": story.thumbnail_url,
+            "caption": story.caption,
+            "location": story.location,
+            "views_count": views,
+            "property_price": property_price,
+            "property_locality": property_locality,
+            "property_city": property_city,
+            "cover_url": cover_url or story.thumbnail_url or story.media_url,
+            "is_hot": is_hot,
+            "is_active": story.is_active,
+            "created_at": story.created_at,
+            "expires_at": story.expires_at,
+            "updated_at": story.updated_at,
+            "is_expired": story.is_expired,
+            "time_remaining_seconds": story.time_remaining,
+        }
+        payload.append(data)
+    return payload
+
 
 def create_story(db: Session, story_data: dict, media_info: dict) -> Story:
     """

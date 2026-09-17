@@ -62,14 +62,16 @@ class Settings(BaseSettings):
     API_KEY: str = ""
 
     # Auth / JWT Settings
-    # NOTE: JWT_SECRET_KEY defaults to a dev-only value — set a real secret via
-    # .env before any non-local deployment. Session handling here is
-    # intentionally simple (single access token, no refresh rotation) per an
-    # explicit "prototype the flow first" scope decision; token expiry is
-    # deliberately long-lived for that reason.
+    # Set JWT_SECRET_KEY via .env before any non-local deployment.
+    # Access tokens expire in 24h by default; clients re-auth on 401 (no refresh yet).
     JWT_SECRET_KEY: str = "dev-only-insecure-secret-change-me"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRY_HOURS: int = 24 * 14
+    JWT_EXPIRY_HOURS: int = 24
+    # HttpOnly session cookie (set Secure=true behind HTTPS in production).
+    SESSION_COOKIE_SECURE: bool = False
+
+    # Optional comma-separated extra CORS origins for staging/production.
+    CORS_ORIGINS_EXTRA: str = ""
 
     # Cashfree Secure ID / DigiLocker eKYC
     # Leave CASHFREE_CLIENT_ID empty to use built-in demo mode (no external API calls).
@@ -81,6 +83,13 @@ class Settings(BaseSettings):
     # If sandbox calls fail (e.g. IP not whitelisted), fall back to local demo responses.
     KYC_DEV_FALLBACK_DEMO: bool = True
 
+    # News headlines (NewsAPI.org or GNews) — cached in DB; cron pulls daily
+    NEWS_API_KEY: str = ""
+    NEWS_PROVIDER: str = "newsapi"  # newsapi | gnews
+    NEWS_QUERY: str = 'Chennai OR "Tamil Nadu" OR RERA OR "real estate" OR housing'
+    NEWS_FETCH_ENABLED: bool = True
+    NEWS_FETCH_HOUR_UTC: int = 3  # once daily
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -88,6 +97,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Merge optional CORS_ORIGINS_EXTRA from env into the allow-list.
+_extra = [o.strip() for o in (settings.CORS_ORIGINS_EXTRA or "").split(",") if o.strip()]
+if _extra:
+    settings.CORS_ORIGINS = list(dict.fromkeys([*settings.CORS_ORIGINS, *_extra]))
 
 
 # Validation function

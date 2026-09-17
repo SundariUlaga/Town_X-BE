@@ -94,7 +94,12 @@ async def approve_advertisement(
         raise HTTPException(status_code=404, detail="Advertisement not found")
     if ad.status not in ("PENDING_REVIEW", "CHANGES_REQUESTED", "APPROVED"):
         raise HTTPException(status_code=400, detail=f"Cannot approve ad in status {ad.status}")
-    if payload.end_date < payload.start_date:
+    # Compare as naive UTC so ISO-Z payloads from the admin UI do not 500
+    from services.ad_lifecycle import _to_naive_utc
+
+    start = _to_naive_utc(payload.start_date)
+    end = _to_naive_utc(payload.end_date)
+    if end < start:
         raise HTTPException(status_code=400, detail="End date must be after start date")
 
     updated = approve_and_schedule(
@@ -102,8 +107,8 @@ async def approve_advertisement(
         ad,
         admin,
         display_position=payload.display_position,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
+        start_date=start,
+        end_date=end,
         show_on_homepage=payload.show_on_homepage,
     )
     crud.refresh_advertisement_statuses(db)

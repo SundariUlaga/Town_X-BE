@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,13 @@ import crud
 from models import Advertisement, User
 
 logger = logging.getLogger(__name__)
+
+
+def _to_naive_utc(dt: datetime) -> datetime:
+    """Normalize API datetimes (often offset-aware) for comparison with utcnow()."""
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _notify(db: Session, user_id: int, type: str, title: str, body: str, payload: dict | None = None) -> None:
@@ -102,6 +109,8 @@ def approve_and_schedule(
     show_on_homepage: bool,
 ) -> Advertisement:
     now = datetime.utcnow()
+    start_date = _to_naive_utc(start_date)
+    end_date = _to_naive_utc(end_date)
     next_status = "PUBLISHED"
     if start_date > now:
         next_status = "APPROVED"

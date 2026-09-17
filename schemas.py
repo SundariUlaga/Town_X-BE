@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, model_validator, validator
 from typing import List, Literal, Optional
-from datetime import datetime
+from datetime import date, datetime
 
 
 # ========================================
@@ -8,6 +8,7 @@ from datetime import datetime
 # ========================================
 
 UserRole = Literal["buyer", "owner", "admin"]
+PublicUserRole = Literal["buyer", "owner"]
 
 
 class UserSignup(BaseModel):
@@ -15,7 +16,7 @@ class UserSignup(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8, description="At least 8 characters")
-    role: UserRole = "buyer"
+    role: PublicUserRole = "buyer"
 
 
 class UserLogin(BaseModel):
@@ -37,7 +38,7 @@ class VerifyOtpRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=15)
     otp: str = Field(..., min_length=6, max_length=6)
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: UserRole = "buyer"
+    role: PublicUserRole = "buyer"
 
 
 class UserResponse(BaseModel):
@@ -102,7 +103,9 @@ NotificationType = Literal[
     "property_changes_requested",
     "property_enquiry",
     "property_submitted",
+    "property_resubmitted",
     "ad_expired",
+    "admin_review_queue",
 ]
 
 
@@ -323,6 +326,63 @@ class PropertyReviewNoteResponse(BaseModel):
         from_attributes = True
 
 
+class ProjectDetailsResponse(BaseModel):
+    id: int
+    property_id: int
+    rera_id: Optional[str] = None
+    builder_name: Optional[str] = None
+    builder_logo_url: Optional[str] = None
+    possession_date: Optional[date] = None
+    launch_date: Optional[date] = None
+    total_units: Optional[int] = None
+    available_units: Optional[int] = None
+    project_status: Optional[str] = None
+    total_towers: Optional[int] = None
+    total_floors: Optional[int] = None
+    price_starting_from: Optional[float] = None
+    price_per_sqft_range_min: Optional[float] = None
+    price_per_sqft_range_max: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectDetailsUpsert(BaseModel):
+    """Owner/builder self-service inventory — does not re-trigger property moderation."""
+
+    rera_id: Optional[str] = Field(None, max_length=100)
+    builder_name: Optional[str] = Field(None, max_length=200)
+    builder_logo_url: Optional[str] = Field(None, max_length=1000)
+    possession_date: Optional[date] = None
+    launch_date: Optional[date] = None
+    total_units: Optional[int] = Field(None, ge=0)
+    available_units: Optional[int] = Field(None, ge=0)
+    project_status: Optional[str] = Field(None, max_length=80)
+    total_towers: Optional[int] = Field(None, ge=0)
+    total_floors: Optional[int] = Field(None, ge=0)
+    price_starting_from: Optional[float] = Field(None, ge=0)
+    price_per_sqft_range_min: Optional[float] = Field(None, ge=0)
+    price_per_sqft_range_max: Optional[float] = Field(None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_units_and_pps(self):
+        if (
+            self.total_units is not None
+            and self.available_units is not None
+            and self.available_units > self.total_units
+        ):
+            raise ValueError("available_units cannot exceed total_units")
+        if (
+            self.price_per_sqft_range_min is not None
+            and self.price_per_sqft_range_max is not None
+            and self.price_per_sqft_range_min > self.price_per_sqft_range_max
+        ):
+            raise ValueError("price_per_sqft_range_min cannot exceed max")
+        return self
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -415,6 +475,12 @@ class PropertyResponse(BaseModel):
     bathrooms: int = 0
     balconies: int = 0
 
+    # Commercial (nullable additive fields)
+    commercial_subtype: Optional[str] = None
+    frontage_ft: Optional[float] = None
+    floor_number: Optional[int] = None
+    washroom_count: Optional[int] = None
+
     # Pricing Details
     expected_price: float
     maintenance_charges: Optional[float] = None
@@ -445,6 +511,9 @@ class PropertyResponse(BaseModel):
     encumbrance_certificate_status: Optional[str] = None
     verification_tier: str = "unverified"
 
+    # Optional 1:1 new-project inventory (null for resale)
+    project_details: Optional["ProjectDetailsResponse"] = None
+
     # Timestamps
     created_at: datetime
     updated_at: datetime
@@ -452,6 +521,10 @@ class PropertyResponse(BaseModel):
     class Config:
         from_attributes = True  # For Pydantic v2
         # orm_mode = True  # Use this for Pydantic v1
+
+
+class FeaturedPropertyResponse(PropertyResponse):
+    feature_reason: Optional[str] = None
 
 
 class RecommendationSection(BaseModel):
@@ -489,6 +562,10 @@ class PropertyCreate(BaseModel):
     parking: int = 0
     bathrooms: int = 0
     balconies: int = 0
+    commercial_subtype: Optional[str] = None
+    frontage_ft: Optional[float] = None
+    floor_number: Optional[int] = None
+    washroom_count: Optional[int] = None
     expected_price: float
     maintenance_charges: Optional[float] = None
     security_deposit: Optional[float] = None
@@ -512,6 +589,10 @@ class PropertyUpdate(BaseModel):
     carpet_area: Optional[float] = None
     expected_price: Optional[float] = None
     furnishing_status: Optional[str] = None
+    commercial_subtype: Optional[str] = None
+    frontage_ft: Optional[float] = None
+    floor_number: Optional[int] = None
+    washroom_count: Optional[int] = None
     description: Optional[str] = None
     is_favourite: Optional[bool] = None
 
@@ -542,6 +623,7 @@ class StoryResponse(BaseModel):
     """Schema for Story API responses"""
     id: int
     user_id: Optional[str] = None
+    user_name: Optional[str] = None
     property_id: Optional[int] = None
 
     # Media info
@@ -554,6 +636,13 @@ class StoryResponse(BaseModel):
     caption: Optional[str] = None
     location: Optional[str] = None
     views_count: int
+
+    # Linked property (for FB-style tray cards)
+    property_price: Optional[float] = None
+    property_locality: Optional[str] = None
+    property_city: Optional[str] = None
+    cover_url: Optional[str] = None
+    is_hot: bool = False
 
     # Status and timestamps
     is_active: bool
@@ -692,6 +781,7 @@ class CategoryStats(BaseModel):
     buy: int
     new_projects: int
     ready_to_move: int
+    commercial: int
     total: int
 
     class Config:
@@ -701,7 +791,8 @@ class CategoryStats(BaseModel):
                 "buy": 30,
                 "new_projects": 12,
                 "ready_to_move": 18,
-                "total": 105
+                "commercial": 7,
+                "total": 112
             }
         }
 
@@ -809,3 +900,26 @@ class LocationSearchResult(BaseModel):
     taluk_id: Optional[int] = None
     taluk_name: Optional[str] = None
     pincode: Optional[str] = None
+
+
+class NewsItemResponse(BaseModel):
+    id: int
+    title: str
+    summary: Optional[str] = None
+    source_name: Optional[str] = None
+    url: str
+    image_url: Optional[str] = None
+    published_at: Optional[datetime] = None
+    fetched_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class NewsRefreshResponse(BaseModel):
+    inserted: int = 0
+    skipped: int = 0
+    seeded: int = 0
+    source: Optional[str] = None
+    fetched: Optional[int] = None
+    error: Optional[str] = None
