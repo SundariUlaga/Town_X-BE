@@ -1,5 +1,6 @@
 """Property enquiries."""
 
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,7 +29,7 @@ class PropertyEnquiryResponse(BaseModel):
     message: str
     contact_method: str
     status: str
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
