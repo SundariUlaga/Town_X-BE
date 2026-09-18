@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import Property, Story, StoryView, SupportQuestion, User, SavedSearch, Notification, Advertisement, UserFavourite, UserActivity, PropertyEnquiry, PropertyReport, AuditLog, PropertyReviewNote, ProjectDetails
+from models import Property, Story, StoryView, SupportQuestion, User, SavedSearch, Notification, Advertisement, UserFavourite, UserActivity, PropertyEnquiry, PropertyReport, AuditLog, PropertyReviewNote, ProjectDetails, Testimonial
 from typing import List, Optional, Dict
 from datetime import date
 
@@ -1613,6 +1613,7 @@ def get_admin_dashboard_stats(db: Session) -> dict:
         "pending_properties": db.query(Property).filter(Property.status == "PENDING_REVIEW").count(),
         "published_properties": db.query(Property).filter(Property.status == "PUBLISHED").count(),
         "open_reports": db.query(PropertyReport).filter(PropertyReport.status == "OPEN").count(),
+        "pending_testimonials": db.query(Testimonial).filter(Testimonial.status == "pending").count(),
         "changes_requested_advertisements": count_advertisements_by_status(db, "CHANGES_REQUESTED"),
         "scheduled_advertisements": count_advertisements_by_status(db, "APPROVED"),
         "published_advertisements": count_advertisements_by_status(db, "PUBLISHED"),

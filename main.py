@@ -53,6 +53,7 @@ from services.notifications import notify_admins_review_queue
 from app.api.enquiries import router as enquiries_router
 from app.api.reports import router as reports_router
 from app.api.news import router as news_router
+from app.api.testimonials import router as testimonials_router
 from services.phone_otp import DEMO_OTP, default_display_name, normalize_phone, phone_email, unusable_password_hash
 from services.property_serialize import serialize_property, serialize_properties
 import crud
@@ -103,6 +104,7 @@ app.include_router(recommendations_router)
 app.include_router(enquiries_router)
 app.include_router(reports_router)
 app.include_router(news_router)
+app.include_router(testimonials_router)
 
 
 # ========================================
@@ -192,18 +194,22 @@ async def startup_event():
         logger.info(
             f"✅ Background scheduler started - cleaning expired stories every {settings.CLEANUP_INTERVAL_HOURS} hour(s)")
 
-        # Seed curated headlines on boot if cache empty (no API burn)
+        # RSS backfill if the cache has no provider-sourced headlines (no API quota)
         try:
             db = next(get_db())
             try:
-                from services.news_fetch import seed_curated_if_empty, refresh_news_cache
+                from models import NewsItem
+                from services.news_fetch import refresh_news_cache
 
-                seeded = seed_curated_if_empty(db)
-                if seeded:
-                    logger.info("📰 Seeded %s curated news headlines", seeded)
-                elif settings.NEWS_API_KEY:
-                    # One opportunistic refresh at startup when keyed
-                    refresh_news_cache(db)
+                has_real = (
+                    db.query(NewsItem)
+                    .filter(NewsItem.is_approved.is_(True), NewsItem.provider.isnot(None))
+                    .first()
+                    is not None
+                )
+                if not has_real:
+                    result = refresh_news_cache(db, include_apis=False)
+                    logger.info("📰 News RSS backfill: %s", result)
             finally:
                 db.close()
         except Exception as e:

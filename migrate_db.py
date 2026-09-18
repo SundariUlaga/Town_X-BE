@@ -32,6 +32,18 @@ PROPERTY_COLUMN_PATCHES: dict[str, str] = {
     "washroom_count": "INTEGER",
 }
 
+NEWS_COLUMN_PATCHES: dict[str, str] = {
+    "category": "VARCHAR",
+    "relevance_score": "INTEGER DEFAULT 0",
+    "provider": "VARCHAR",
+}
+
+TESTIMONIAL_COLUMN_PATCHES: dict[str, str] = {
+    "submitted_by_user_id": "INTEGER",
+    "source_enquiry_id": "INTEGER",
+    "source_enquiry_kind": "VARCHAR",
+}
+
 USER_COLUMN_PATCHES: dict[str, str] = {
     "kyc_status": "VARCHAR DEFAULT 'pending'",
     "kyc_verification_id": "VARCHAR",
@@ -87,6 +99,30 @@ def ensure_schema(db_engine: Engine | None = None) -> None:
                 _add_column_if_missing(
                     conn, "users", column, _sql_type(dialect, logical)
                 )
+
+        if inspector.has_table("news_items"):
+            for column, logical in NEWS_COLUMN_PATCHES.items():
+                _add_column_if_missing(
+                    conn, "news_items", column, _sql_type(dialect, logical)
+                )
+
+        if inspector.has_table("testimonials"):
+            for column, logical in TESTIMONIAL_COLUMN_PATCHES.items():
+                _add_column_if_missing(
+                    conn, "testimonials", column, _sql_type(dialect, logical)
+                )
+
+        if inspector.has_table("property_enquiries"):
+            _add_column_if_missing(
+                conn, "property_enquiries", "closed_at", _sql_type(dialect, "DATETIME")
+            )
+        if inspector.has_table("advertisement_enquiries"):
+            _add_column_if_missing(
+                conn,
+                "advertisement_enquiries",
+                "closed_at",
+                _sql_type(dialect, "DATETIME"),
+            )
 
 
 def create_tables() -> None:

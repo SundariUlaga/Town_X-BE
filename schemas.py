@@ -102,6 +102,9 @@ NotificationType = Literal[
     "property_rejected",
     "property_changes_requested",
     "property_enquiry",
+    "advertisement_enquiry",
+    "enquiry_closed",
+    "testimonial_pending",
     "property_submitted",
     "property_resubmitted",
     "ad_expired",
@@ -240,6 +243,7 @@ class AdminDashboardStatsResponse(BaseModel):
     pending_properties: int = 0
     published_properties: int = 0
     open_reports: int = 0
+    pending_testimonials: int = 0
     changes_requested_advertisements: int
     scheduled_advertisements: int
     published_advertisements: int
@@ -902,6 +906,80 @@ class LocationSearchResult(BaseModel):
     pincode: Optional[str] = None
 
 
+# ========================================
+# TESTIMONIALS
+# ========================================
+
+TestimonialCategory = Literal["buyer", "owner", "renter"]
+TestimonialStatus = Literal["pending", "approved", "rejected"]
+
+
+class TestimonialPublicItem(BaseModel):
+    id: int
+    name: str
+    role: str
+    location: Optional[str] = None
+    quote: str
+    rating: int = 5
+    category: TestimonialCategory = "buyer"
+    outcome: Optional[str] = None
+    avatar_url: Optional[str] = None
+    is_verified: bool = False
+    display_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class TestimonialStats(BaseModel):
+    listings_live: int = 0
+    listings_live_label: str = "0"
+    enquiries_48h: int = 0
+    enquiries_48h_label: str = "0"
+    verified_listings: int = 0
+    verified_listings_label: str = "0"
+
+
+class TestimonialPublicResponse(BaseModel):
+    items: List[TestimonialPublicItem]
+    stats: TestimonialStats
+
+
+class TestimonialAdminItem(TestimonialPublicItem):
+    avatar_public_id: Optional[str] = None
+    is_featured: bool = False
+    status: TestimonialStatus = "approved"
+    submitted_by_user_id: Optional[int] = None
+    source_enquiry_id: Optional[int] = None
+    source_enquiry_kind: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EnquiryFeedbackCreate(BaseModel):
+    source: Literal["property", "advertisement"] = "property"
+    enquiry_id: int
+    quote: str = Field(..., min_length=10, max_length=600)
+    rating: int = Field(5, ge=1, le=5)
+    outcome: Optional[str] = Field(None, max_length=80)
+
+
+class EnquiryFeedbackResponse(BaseModel):
+    id: int
+    status: TestimonialStatus
+    message: str = "Thanks - Town-X will review this before it appears on the homepage."
+
+
+class TestimonialReorderRequest(BaseModel):
+    ordered_ids: List[int] = Field(..., min_length=1)
+
+
+class TestimonialFeatureRequest(BaseModel):
+    is_featured: bool
+
+
 class NewsItemResponse(BaseModel):
     id: int
     title: str
@@ -911,6 +989,9 @@ class NewsItemResponse(BaseModel):
     image_url: Optional[str] = None
     published_at: Optional[datetime] = None
     fetched_at: Optional[datetime] = None
+    category: Optional[str] = None
+    relevance_score: int = 0
+    provider: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -920,6 +1001,10 @@ class NewsRefreshResponse(BaseModel):
     inserted: int = 0
     skipped: int = 0
     seeded: int = 0
+    retired: int = 0
+    rss: int = 0
+    newsapi: int = 0
+    gnews: int = 0
     source: Optional[str] = None
     fetched: Optional[int] = None
     error: Optional[str] = None

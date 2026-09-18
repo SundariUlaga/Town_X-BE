@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     CLOUDINARY_FOLDER_PROPERTIES: str = "properties"
     CLOUDINARY_FOLDER_STORIES: str = "stories"
     CLOUDINARY_FOLDER_ADS: str = "advertisements"
+    CLOUDINARY_FOLDER_TESTIMONIALS: str = "testimonials"
 
     # Security Settings (Optional)
     API_KEY_ENABLED: bool = False
@@ -83,9 +84,11 @@ class Settings(BaseSettings):
     # If sandbox calls fail (e.g. IP not whitelisted), fall back to local demo responses.
     KYC_DEV_FALLBACK_DEMO: bool = True
 
-    # News headlines (NewsAPI.org or GNews) — cached in DB; cron pulls daily
-    NEWS_API_KEY: str = ""
-    NEWS_PROVIDER: str = "newsapi"  # newsapi | gnews
+    # News headlines — RSS always; NewsAPI + GNews optional free tiers
+    NEWSAPI_KEY: str = ""
+    GNEWS_KEY: str = ""
+    NEWS_API_KEY: str = ""  # legacy alias for NEWSAPI_KEY
+    NEWS_PROVIDER: str = "newsapi"
     NEWS_QUERY: str = 'Chennai OR "Tamil Nadu" OR RERA OR "real estate" OR housing'
     NEWS_FETCH_ENABLED: bool = True
     NEWS_FETCH_HOUR_UTC: int = 3  # once daily
