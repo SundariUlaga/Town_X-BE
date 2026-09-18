@@ -64,9 +64,10 @@ class Settings(BaseSettings):
 
     # Auth / JWT Settings
     # Set JWT_SECRET_KEY via .env before any non-local deployment.
-    # Access tokens expire in 24h by default; clients re-auth on 401 (no refresh yet).
+    # Access tokens are short-lived; refresh tokens last JWT_EXPIRY_HOURS (session TTL).
     JWT_SECRET_KEY: str = "dev-only-insecure-secret-change-me"
     JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_EXPIRY_MINUTES: int = 15
     JWT_EXPIRY_HOURS: int = 24
     # HttpOnly session cookie (set Secure=true behind HTTPS in production).
     SESSION_COOKIE_SECURE: bool = False

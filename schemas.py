@@ -387,9 +387,16 @@ class ProjectDetailsUpsert(BaseModel):
         return self
 
 
+class RefreshTokenRequest(BaseModel):
+    """Optional body token for clients that cannot send the refresh cookie."""
+    refresh_token: Optional[str] = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
+    expires_in: int = 0
     user: UserResponse
 
 

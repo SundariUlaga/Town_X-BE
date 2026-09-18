@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query, Request, Response
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query, Request, Response, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -24,6 +24,7 @@ from schemas import (
     UserLogin,
     UserResponse,
     TokenResponse,
+    RefreshTokenRequest,
     SendOtpRequest,
     SendOtpResponse,
     VerifyOtpRequest,
@@ -33,13 +34,16 @@ from config import settings, validate_file_extension, get_max_file_size, is_vide
 from auth import (
     hash_password,
     verify_password,
-    create_access_token,
     get_current_user,
     get_optional_current_user,
     require_kyc_verified,
     require_role,
-    attach_session_cookie,
     clear_session_cookie,
+    extract_refresh_token,
+    decode_token,
+    load_user_from_payload,
+    issue_auth_session,
+    REFRESH_TOKEN_TYPE,
 )
 from app.api.locations import router as locations_router
 from app.api.kyc import router as kyc_router
@@ -306,10 +310,8 @@ async def signup_endpoint(
         password_hash=hash_password(payload.password),
         role=payload.role,
     )
-    token = create_access_token(user)
-    attach_session_cookie(response, token)
     logger.info(f"✅ Signup successful - {user.email} ({user.role})")
-    return TokenResponse(access_token=token, user=user)
+    return TokenResponse(**issue_auth_session(response, user))
 
 
 @app.post("/api/auth/login", response_model=TokenResponse)
@@ -328,10 +330,8 @@ async def login_endpoint(
             detail="Administrators sign in at the Admin Console, not Town-X.",
         )
 
-    token = create_access_token(user)
-    attach_session_cookie(response, token)
     logger.info(f"✅ Login successful - {user.email} ({user.role})")
-    return TokenResponse(access_token=token, user=user)
+    return TokenResponse(**issue_auth_session(response, user))
 
 
 @app.post("/api/auth/send-otp", response_model=SendOtpResponse)
@@ -370,10 +370,8 @@ async def verify_otp_endpoint(
                 status_code=403,
                 detail="Administrators sign in at the Admin Console, not Town-X.",
             )
-        token = create_access_token(user)
-        attach_session_cookie(response, token)
         logger.info("✅ OTP login - %s (%s)", phone, user.role)
-        return TokenResponse(access_token=token, user=user)
+        return TokenResponse(**issue_auth_session(response, user))
 
     name = (payload.name or "").strip()
     if len(name) < 2:
@@ -394,10 +392,8 @@ async def verify_otp_endpoint(
         role=role,
         phone=phone,
     )
-    token = create_access_token(user)
-    attach_session_cookie(response, token)
     logger.info("✅ OTP signup - %s (%s)", phone, user.role)
-    return TokenResponse(access_token=token, user=user)
+    return TokenResponse(**issue_auth_session(response, user))
 
 
 @app.get("/api/auth/me", response_model=UserResponse)
@@ -406,9 +402,31 @@ async def get_me_endpoint(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@app.post("/api/auth/refresh", response_model=TokenResponse)
+async def refresh_endpoint(
+    response: Response,
+    request: Request,
+    payload: RefreshTokenRequest = Body(default=RefreshTokenRequest()),
+    db: Session = Depends(get_db),
+):
+    """Rotate access + refresh tokens while the refresh session is valid."""
+    body_token = payload.refresh_token if payload else None
+    token = extract_refresh_token(request, body_token)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        claims = decode_token(token, REFRESH_TOKEN_TYPE)
+    except HTTPException:
+        clear_session_cookie(response)
+        raise
+    user = load_user_from_payload(db, claims)
+    logger.info("🔄 Session refreshed - %s (%s)", user.email, user.role)
+    return TokenResponse(**issue_auth_session(response, user))
+
+
 @app.post("/api/auth/logout", response_model=MessageResponse)
 async def logout_endpoint(response: Response):
-    """Clear the HttpOnly session cookie. Client should also clear local cache."""
+    """Clear HttpOnly access + refresh cookies. Client should also clear local cache."""
     clear_session_cookie(response)
     return MessageResponse(message="Logged out")
 
